@@ -1,14 +1,28 @@
 import { bonusDe, comPonto, derivados, PONTOS_INICIAIS } from './atributos'
 import {
+  acoesDisponiveis,
   aplicarAcao,
   criarBatalha,
   criarUnidadeHeroi,
   criarUnidadesGoblin,
   recompensaVitoria,
-  usaMana,
+  type ItensUsaveis,
 } from './combate'
-import { CATALOGO_ITENS, sortearDrop } from './itens'
+import { dialogoDe } from './dialogos'
+import { CATALOGO_ITENS, buscarItem, sortearDropDeGoblin } from './itens'
 import { FASE_INICIAL, avancarFase } from './missoes'
+import {
+  adicionarLoot,
+  alvoInteracao,
+  criarMundo,
+  dispersarGrupo,
+  grupoEmAlcance,
+  moverHeroi,
+  moverHeroiFluido,
+  pegarLote,
+  vagarGoblins,
+  velocidadeDoHeroi,
+} from './mundo'
 import type { Sorteador } from './random'
 import {
   batalhaDoSnapshot,
@@ -19,16 +33,22 @@ import {
   type Armazenamento,
   type SnapshotBatalha,
 } from './save'
-import type {
-  AcaoBatalha,
-  Classe,
-  EstadoBatalha,
-  FaseMissao,
-  Item,
-  Personagem,
-  PontosAtributo,
-  Posicao,
-  Raca,
+import {
+  ehConsumivel,
+  type AcaoBatalha,
+  type Classe,
+  type Consumivel,
+  type Direcao,
+  type EstadoBatalha,
+  type FaseMissao,
+  type Item,
+  type ItemDaBag,
+  type Mundo,
+  type Personagem,
+  type PontosAtributo,
+  type Posicao,
+  type Raca,
+  type Unidade,
 } from './tipos'
 
 export const CHAVE_SAVE = 'endless:batalha'
@@ -37,17 +57,27 @@ export const POSICAO_HEROI_BATALHA: Readonly<Posicao> = { x: 64, y: 96 }
 export interface EstadoJogo {
   fase: FaseMissao
   personagem: Personagem | null
-  bag: Item[]
+  bag: ItemDaBag[]
+  mundo: Mundo
   batalha: EstadoBatalha | null
   snapshot: SnapshotBatalha | null
   pontosPendente: number
   aviso: string | null
+  // O diálogo em andamento. `null` é o estado normal, e um número é a página
+  // que está na tela.
+  dialogo: { rota: string; pagina: number } | null
 }
 
 export type AcaoJogo =
   | { tipo: 'criarPersonagem'; nome: string; raca: Raca; classe: Classe }
   | { tipo: 'distribuirPonto'; atributo: keyof PontosAtributo }
   | { tipo: 'avancarMissao' }
+  | { tipo: 'mover'; direcao: Direcao }
+  | { tipo: 'moverFluido'; direcao: Direcao | null; dt: number }
+  | { tipo: 'passarTempo' }
+  | { tipo: 'interagir' }
+  | { tipo: 'avancarDialogo' }
+  | { tipo: 'fecharDialogo' }
   | { tipo: 'iniciarBatalha'; grupoId: string; posInimigos: readonly Posicao[] }
   | { tipo: 'agir'; acao: AcaoBatalha }
   | { tipo: 'reiniciarBatalha' }
@@ -65,10 +95,12 @@ export const ESTADO_INICIAL: EstadoJogo = {
   fase: FASE_INICIAL,
   personagem: null,
   bag: [],
+  mundo: criarMundo(),
   batalha: null,
   snapshot: null,
   pontosPendente: 0,
   aviso: null,
+  dialogo: null,
 }
 
 function novoPersonagem(nome: string, raca: Raca, classe: Classe): Personagem {
@@ -95,6 +127,79 @@ function fecharBatalha(estado: EstadoJogo, fase: FaseMissao): EstadoJogo {
   }
 }
 
+// A tela de fim de batalha mostra o que o jogador ganhou, então o texto mora
+// aqui, junto de quem decide o que foi ganho.
+function textoDeVitoria(pontos: number, lotes: number): string {
+  const pontosTexto = pontos === 1 ? '1 ponto de atributo' : `${pontos} pontos de atributo`
+  const lootTexto =
+    lotes === 0 ? '' : lotes === 1 ? ' Um item ficou no chão.' : ` ${lotes} itens ficaram no chão.`
+  return `Você venceu! Ganhou ${pontosTexto}.${lootTexto}`
+}
+
+// A batalha não vê a bag, ela recebe só a lista do que pode usar agora. Quem
+// monta essa lista é o estado, porque quem tem a bag é o estado.
+function itensUsaveis(estado: Readonly<EstadoJogo>): ItensUsaveis {
+  const consumiveis: Consumivel[] = []
+  for (const item of estado.bag) {
+    if (!ehConsumivel(item)) continue
+    consumiveis.push({ id: item.id, nome: item.nome, cura: item.cura })
+  }
+  return { consumiveis }
+}
+
+// Todo consumível guardado na bag vale na batalha, duplicata vale em cópia. A
+// lista vem do estado porque a bag é dele, e a batalha só recebe a lista pronta.
+export function consumiveisDaBag(estado: Readonly<EstadoJogo>): readonly Consumivel[] {
+  return itensUsaveis(estado).consumiveis
+}
+
+// Tira uma unidade só do consumível usado. Duas poções na bag são duas poções, e
+// usar uma tem que deixar a outra lá.
+function consumirItem(bag: readonly ItemDaBag[], itemId: string): ItemDaBag[] {
+  const restante = [...bag]
+  const indice = restante.findIndex((item) => item.id === itemId)
+  if (indice >= 0) restante.splice(indice, 1)
+  return restante
+}
+
+// Quem joga agora. A batalha nunca fica parada num morto, então procurar o id da
+// ordem na posição atual é seguro mesmo depois de um ataque fatal.
+function unidadeAtual(batalha: Readonly<EstadoBatalha>): Unidade | undefined {
+  const id = batalha.ordem[batalha.indiceTurno]
+  return batalha.unidades.find((unidade) => unidade.id === id && unidade.vida > 0)
+}
+
+// Ações que a caixa de opções mostra no turno atual. A UI chama isso em vez de
+// repetir a regra, para a caixa e a batalha nunca discordarem.
+export function acoesDoTurno(estado: Readonly<EstadoJogo>): AcaoBatalha['tipo'][] {
+  const batalha = estado.batalha
+  if (batalha === null) return []
+  const unidade = unidadeAtual(batalha)
+  if (unidade === undefined) return []
+  return acoesDisponiveis(batalha, unidade, itensUsaveis(estado))
+}
+
+// Quando o herói chega perto de um grupo de goblin, a batalha começa. O mesmo
+// gatilho vale para passo discreto e para movimento contínuo, então a regra
+// fica num lugar só.
+function avancaMundo(estado: EstadoJogo, mundo: Mundo, deps: Dependencias): EstadoJogo {
+  if (mundo === estado.mundo) return comAviso(estado, null)
+
+  const grupo = grupoEmAlcance(mundo)
+  if (grupo !== null && estado.fase !== 'cidade') {
+    return comAviso(
+      reducer(
+        { ...estado, mundo },
+        { tipo: 'iniciarBatalha', grupoId: grupo.grupoId, posInimigos: grupo.posInimigos },
+        deps,
+      ),
+      null,
+    )
+  }
+
+  return comAviso({ ...estado, mundo }, null)
+}
+
 function reduzirBatalha(
   estado: EstadoJogo,
   acao: AcaoBatalha,
@@ -106,30 +211,48 @@ function reduzirBatalha(
     return comAviso(estado, 'Não há batalha em andamento.')
   }
 
-  const resultado = aplicarAcao(batalha, acao, deps.rng)
+  const resultado = aplicarAcao(batalha, acao, deps.rng, itensUsaveis(estado))
   if (!resultado.ok) return comAviso(estado, resultado.motivo)
 
   const proxima = resultado.estado
+  // O consumível sai da bag assim que é usado, e não só quando a batalha acaba.
+  // Item de atributo não é usado, então continua lá.
+  const bagUsando =
+    acao.tipo === 'usarItem' ? consumirItem(estado.bag, acao.itemId) : estado.bag
 
   if (proxima.fase === 'derrota') {
-    return comAviso({ ...estado, batalha: proxima }, null)
+    return comAviso({ ...estado, batalha: proxima, bag: bagUsando }, resultado.mensagem)
   }
 
   if (proxima.fase === 'vitoria' || proxima.fase === 'fuga') {
     const recompensa = proxima.fase === 'vitoria'
-      ? recompensaVitoria(proxima, () => sortearDrop(deps.rng))
-      : { itens: [], pontosAtributo: 0 }
+      ? recompensaVitoria(proxima, () => sortearDropDeGoblin(deps.rng))
+      : { loot: [], pontosAtributo: 0 }
+
+    const comLoot = recompensa.loot.reduce<Mundo>(
+      (mundo, item) => adicionarLoot(mundo, item.unidadeId, item.pos, item.item),
+      estado.mundo,
+    )
+
+    const idsDoGrupo = proxima.unidades
+      .filter((unidade) => !unidade.ehHeroi)
+      .map((unidade) => unidade.id)
+    const mundo = proxima.fase === 'fuga' ? dispersarGrupo(comLoot, idsDoGrupo) : comLoot
+
     return comAviso(
       {
         ...fecharBatalha(estado, 'retorno'),
-        bag: [...estado.bag, ...recompensa.itens],
+        mundo,
+        bag: bagUsando,
         pontosPendente: estado.pontosPendente + recompensa.pontosAtributo,
       },
-      proxima.fase === 'fuga' ? 'Você fugiu da batalha.' : null,
+      proxima.fase === 'fuga'
+        ? 'Você fugiu da batalha.'
+        : textoDeVitoria(recompensa.pontosAtributo, recompensa.loot.length),
     )
   }
 
-  return comAviso({ ...estado, batalha: proxima }, null)
+  return comAviso({ ...estado, batalha: proxima, bag: bagUsando }, resultado.mensagem)
 }
 
 export function reducer(
@@ -179,6 +302,76 @@ export function reducer(
       }
       return comAviso({ ...estado, fase: avancarFase(estado.fase) }, null)
     }
+
+    case 'mover': {
+      const personagem = estado.personagem
+      if (personagem === null) return comAviso(estado, 'Sem personagem.')
+      if (estado.dialogo !== null) return comAviso(estado, null)
+      if (estado.batalha !== null) return comAviso(estado, null)
+
+      return avancaMundo(estado, moverHeroi(estado.mundo, acao.direcao), deps)
+    }
+
+    case 'moverFluido': {
+      const personagem = estado.personagem
+      if (personagem === null) return comAviso(estado, 'Sem personagem.')
+      if (acao.dt <= 0) return comAviso(estado, null)
+      if (estado.dialogo !== null) return comAviso(estado, null)
+      if (estado.batalha !== null) return comAviso(estado, null)
+
+      const movido = moverHeroiFluido(
+        estado.mundo,
+        acao.direcao,
+        acao.dt,
+        velocidadeDoHeroi(personagem),
+      )
+      return avancaMundo(estado, movido, deps)
+    }
+
+    case 'passarTempo': {
+      // Um tick, não um segundo: quem desenha chama `passarTempo` a
+      // `TICKS_VAGAR_POR_SEGUNDO` vezes por segundo. O tempo do mundo só anda
+      // fora de batalha e fora de diálogo, porque neles quem decide o ritmo é
+      // o jogador.
+      if (estado.batalha !== null || estado.dialogo !== null) {
+        return comAviso(estado, null)
+      }
+      if (estado.personagem === null) return comAviso(estado, null)
+
+      return avancaMundo(estado, vagarGoblins(estado.mundo, deps.rng), deps)
+    }
+
+    case 'interagir': {
+      if (estado.personagem === null) return comAviso(estado, 'Sem personagem.')
+
+      if (estado.dialogo !== null) return proximoDialogo(estado)
+
+      const alvo = alvoInteracao(estado.mundo)
+      if (alvo === null) return comAviso(estado, 'Não há nada aqui.')
+
+      if (alvo.tipo === 'npc') {
+        return comAviso(
+          { ...estado, dialogo: { rota: alvo.npc.rota, pagina: 0 } },
+          null,
+        )
+      }
+
+      const item = alvo.lote.item
+      return comAviso(
+        {
+          ...estado,
+          mundo: pegarLote(estado.mundo, alvo.lote.id),
+          bag: [...estado.bag, item],
+        },
+        `${item.nome} foi para a bag.`,
+      )
+    }
+
+    case 'avancarDialogo':
+      return proximoDialogo(estado)
+
+    case 'fecharDialogo':
+      return comAviso({ ...estado, dialogo: null }, null)
 
     case 'iniciarBatalha': {
       const personagem = estado.personagem
@@ -230,6 +423,7 @@ export function reducer(
       if (personagem === null) return comAviso(estado, 'Sem personagem.')
       const item = estado.bag.find((candidato) => candidato.id === acao.itemId)
       if (item === undefined) return comAviso(estado, 'Esse item não está na bag.')
+      if ('cura' in item) return comAviso(estado, 'Consumível não equipa.')
 
       return comAviso(
         {
@@ -237,7 +431,7 @@ export function reducer(
           bag: estado.bag.filter((candidato) => candidato.id !== acao.itemId),
           personagem: {
             ...personagem,
-            itensEquipados: [...personagem.itensEquipados, item.id],
+            itensEquipados: [...personagem.itensEquipados, (item as Item).id],
           },
         },
         null,
@@ -250,7 +444,7 @@ export function reducer(
       if (!personagem.itensEquipados.includes(acao.itemId)) {
         return comAviso(estado, 'Esse item não está equipado.')
       }
-      const item = CATALOGO_ITENS.find((candidato) => candidato.id === acao.itemId)
+      const item = buscarItem(acao.itemId)
 
       return comAviso(
         {
@@ -291,6 +485,29 @@ export function reducer(
   }
 }
 
-export function mostrarManaDoPersonagem(estado: EstadoJogo): boolean {
-  return estado.personagem !== null && usaMana(estado.personagem.classe)
+// E no meio do diálogo avança a página, e na última página fecha. Uma tecla só
+// para as duas coisas, que é como diálogo funciona em RPG de turno.
+function proximoDialogo(estado: EstadoJogo): EstadoJogo {
+  const dialogo = estado.dialogo
+  if (dialogo === null) return estado
+
+  const paginas = dialogoDe(dialogo.rota)
+  const proxima = dialogo.pagina + 1
+
+  if (proxima >= paginas.length) return { ...estado, dialogo: null }
+  return { ...estado, dialogo: { rota: dialogo.rota, pagina: proxima } }
+}
+
+export function paginaDoDialogo(estado: Readonly<EstadoJogo>): string {
+  const dialogo = estado.dialogo
+  if (dialogo === null) return ''
+  const pagina = dialogoDe(dialogo.rota)[dialogo.pagina]
+  return pagina?.texto ?? ''
+}
+
+export function nomeDoDialogo(estado: Readonly<EstadoJogo>): string {
+  const dialogo = estado.dialogo
+  if (dialogo === null) return ''
+  const pagina = dialogoDe(dialogo.rota)[dialogo.pagina]
+  return pagina?.nome ?? ''
 }

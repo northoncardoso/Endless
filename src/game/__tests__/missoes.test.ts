@@ -21,10 +21,10 @@ import {
   criarArmazenamentoLocal,
   criarArmazenamentoMemoria,
   criarSnapshot,
-  ehSnapshotValido,
   gravarSnapshot,
   lerSnapshot,
 } from '../save'
+import { ehSnapshotValido } from '../validacao'
 import type {
   EstadoBatalha,
   FaseMissao,

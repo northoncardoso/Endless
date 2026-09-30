@@ -6,6 +6,12 @@ export const TAMANHO_TILE = 16
 export const RAIO_GATILHO_PIXELS = 24
 export const RAIO_VAGAR_TILES = 3
 export const TILES_APOS_FUGA = 6
+// Vagar é contado em ticks, não em segundos, para a regra não depender do
+// relógio. Quem desenha precisa chamar o tick a essa taxa, senão o goblin anda
+// devagar ou rápido conforme o monitor.
+export const TICKS_VAGAR_POR_SEGUNDO = 6
+// Cada pausa dura 3 ticks, porque PASSOS_ANTES_PAUSA conta o tick em que o
+// goblin bateu na borda mais os dois seguintes parados.
 export const PASSOS_ANTES_PAUSA = 2
 export const REGENERACAO_VIDE_POR_SEGUNDO = 1
 
@@ -70,6 +76,35 @@ export function mover(
     y: de.y + passoAtual.y * TAMANHO_TILE,
   }
   return podeOcupar(mapa, destino) ? destino : null
+}
+
+// Movimento contínuo, para o personagem andar enquanto a tecla está segurada.
+// A distância vem dos derivados em tiles por segundo, e `dt` é o tempo em
+// segundos. A colisão é resolvida eixo por eixo: se o eixo X está bloqueado, o
+// Y ainda anda, que é o escorregamento na parede.
+export function moverFluido(
+  mapa: Readonly<Mapa>,
+  de: Readonly<Posicao>,
+  direcao: Direcao | null,
+  dt: number,
+  tilesPorSegundo: number,
+): Posicao {
+  if (direcao === null || dt <= 0 || tilesPorSegundo <= 0) return de
+
+  const passoAtual = passo(direcao)
+  const caminho = tilesPorSegundo * dt * TAMANHO_TILE
+
+  let x = de.x + passoAtual.x * caminho
+  let y = de.y + passoAtual.y * caminho
+
+  if (ehSolido(mapa, tileDe({ x, y: de.y }))) x = de.x
+  if (ehSolido(mapa, tileDe({ x, y }))) y = de.y
+
+  // A verificação final pega o canto: os dois eixos individualmente livres, mas
+  // o destino final dentro da parede.
+  if (ehSolido(mapa, tileDe({ x, y }))) return de
+
+  return { x, y }
 }
 
 // Dá UM passo na direção do destino, e só um. Se o passo principal bate em

@@ -78,12 +78,12 @@ function unidadeDeTeste(vida: number): Unidade {
     vidaMaxima: 100,
     mana: 0,
     manaMaxima: 0,
-    velocidade: 10,
     ataqueFisico: 10,
     ataqueDistancia: 10,
     danoMagico: 10,
     tipoAtaque: 'fisico',
     defendendo: false,
+    esquiva: 0,
     ehHeroi: true,
   }
 }
