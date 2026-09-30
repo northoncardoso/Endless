@@ -38,7 +38,9 @@ issues abertas.
 |---|---|
 | Spec de design | pronta e aprovada |
 | Scaffold, CI e lint | pronto |
-| Regras do jogo com teste | pronta, 132 testes |
+| Regras do jogo com teste | prontas, 222 testes |
+| Mundo, interação, NPCs e goblins | regra pronta, falta o desenho |
+| Save confiável com validação estrita | pronta |
 | Arte do LPC | issue aberta, waiting |
 | Telas de criação, bag e diálogo | issue aberta |
 | Mundo, câmera e minimapa | issue aberta |
