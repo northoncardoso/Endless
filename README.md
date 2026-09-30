@@ -38,13 +38,15 @@ issues abertas.
 |---|---|
 | Spec de design | pronta e aprovada |
 | Scaffold, CI e lint | pronto |
-| Regras do jogo com teste | em andamento |
-| Telas de criação, bag e diálogo | planejado |
-| Mundo, câmera e minimapa | planejado |
-| Tela de batalha | planejado |
+| Regras do jogo com teste | pronta, 132 testes |
+| Arte do LPC | issue aberta, waiting |
+| Telas de criação, bag e diálogo | issue aberta |
+| Mundo, câmera e minimapa | issue aberta |
+| Tela de batalha | issue aberta |
 
 O que não existe ainda está listado como issue no repositório, para não virar
-promessa de README.
+promessa de README. A regra do projeto é simples: um item novo nasce como issue
+antes de virar código.
 
 ## Decisões que valem uma linha cada
 
