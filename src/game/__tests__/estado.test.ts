@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { PONTOS_INICIAIS } from '../atributos'
 import { CUSTO_HABILIDADE, unidadeAtual, unidadePorId } from '../combate'
+import { dialogoDe } from '../dialogos'
 import { criarSorteador, type Sorteador } from '../random'
 import { criarArmazenamentoMemoria } from '../save'
 import {
   ESTADO_INICIAL,
   POSICAO_HEROI_BATALHA,
+  acoesDoTurno,
   reducer,
   type Dependencias,
   type EstadoJogo,
@@ -256,22 +258,31 @@ describe('batalha', () => {
 
     expect(estado.batalha).toBeNull()
     expect(estado.fase).toBe('retorno')
-    expect(estado.aviso).toBeNull()
+    expect(estado.aviso).toContain('Você venceu')
   })
 
   it('vencer dá 1 ponto por goblin e um drop por goblin, no pior dia', () => {
     const estado = jogarAteFim(emBatalha(criar()), () => 0)
 
     expect(estado.pontosPendente).toBe(2)
-    expect(estado.bag).toHaveLength(2)
     expect(estado.fase).toBe('retorno')
+    // O drop não vai para a bag direto: fica no chão, e quem pega é o jogador
+    // com a tecla E.
+    expect(estado.bag).toHaveLength(0)
+    expect(estado.mundo.loot).toHaveLength(2)
   })
 
   it('vencer nunca dá mais que um drop por goblin', () => {
     const estado = jogarAteFim(emBatalha(criar()), () => 0.99)
 
-    expect(estado.bag.length).toBeLessThanOrEqual(2)
+    expect(estado.mundo.loot.length).toBeLessThanOrEqual(2)
     expect(estado.pontosPendente).toBe(2)
+  })
+
+  it('vencer com dois drops avisa quantos itens ficaram no chão', () => {
+    const estado = jogarAteFim(emBatalha(criar()), () => 0)
+
+    expect(estado.aviso).toContain('2 itens ficaram no chão')
   })
 
   it('fugir volta para o retorno, sem drop e sem ponto', () => {
@@ -388,6 +399,257 @@ describe('batalha', () => {
 
     expect(resultado.batalha).toBeNull()
     expect(resultado.aviso).not.toBeNull()
+  })
+})
+
+describe('interação e diálogo', () => {
+  function comHeroiPerto(
+    estado: EstadoJogo,
+    alvo: { id: string; pos: Posicao } & Record<string, unknown>,
+  ): EstadoJogo {
+    return {
+      ...estado,
+      mundo: {
+        ...estado.mundo,
+        heroi: { ...alvo.pos },
+        npcs: 'rota' in alvo ? [alvo as never] : [],
+        loot: 'item' in alvo ? [alvo as never] : [],
+      },
+    }
+  }
+
+  const ELFA = {
+    id: 'elfa-caravana',
+    nome: 'Elfa da caravana',
+    pos: { x: 128, y: 128 },
+    rota: 'caravana',
+    vendeItem: false,
+  }
+
+  const LOTE = {
+    id: 'grupo-a-0',
+    pos: { x: 128, y: 128 },
+    item: { id: 'pao-de-viagem', nome: 'Pão de viagem', cura: 10 },
+  }
+
+  it('E sem nada por perto avisa que não há nada', () => {
+    const estado = reducer(criar(), { tipo: 'interagir' }, deps())
+
+    expect(estado.aviso).toBe('Não há nada aqui.')
+    expect(estado.dialogo).toBeNull()
+  })
+
+  it('E no NPC abre a primeira página do diálogo', () => {
+    const resultado = reducer(comHeroiPerto(criar(), ELFA), { tipo: 'interagir' }, deps())
+
+    expect(resultado.dialogo).toEqual({ rota: 'caravana', pagina: 0 })
+  })
+
+  it('E avança a página enquanto o diálogo está aberto', () => {
+    const aberto = reducer(comHeroiPerto(criar(), ELFA), { tipo: 'interagir' }, deps())
+
+    const segunda = reducer(aberto, { tipo: 'interagir' }, deps())
+
+    expect(segunda.dialogo).toEqual({ rota: 'caravana', pagina: 1 })
+  })
+
+  it('E na última página fecha o diálogo', () => {
+    const estado = comHeroiPerto(criar(), ELFA)
+    const paginas = dialogoDe('caravana').length
+
+    let atual = reducer(estado, { tipo: 'interagir' }, deps())
+    for (let i = 1; i < paginas; i += 1) {
+      atual = reducer(atual, { tipo: 'interagir' }, deps())
+    }
+    expect(atual.dialogo?.pagina).toBe(paginas - 1)
+
+    const fechado = reducer(atual, { tipo: 'interagir' }, deps())
+    expect(fechado.dialogo).toBeNull()
+  })
+
+  it('a ação de fechar diálogo encerra na hora', () => {
+    const aberto = reducer(comHeroiPerto(criar(), ELFA), { tipo: 'interagir' }, deps())
+
+    expect(reducer(aberto, { tipo: 'fecharDialogo' }, deps()).dialogo).toBeNull()
+  })
+
+  it('E com loot na frente tira do chão e põe na bag', () => {
+    const resultado = reducer(comHeroiPerto(criar(), LOTE), { tipo: 'interagir' }, deps())
+
+    expect(resultado.mundo.loot).toHaveLength(0)
+    expect(resultado.bag.map((item) => item.id)).toEqual(['pao-de-viagem'])
+    expect(resultado.aviso).toContain('Pão de viagem')
+  })
+
+  it('NPC ganha de loot quando estão os dois no mesmo raio', () => {
+    const estado: EstadoJogo = {
+      ...criar(),
+      mundo: {
+        ...criar().mundo,
+        heroi: { x: 128, y: 128 },
+        npcs: [ELFA],
+        loot: [{ ...LOTE, id: 'qualquer' }],
+      },
+    }
+
+    const resultado = reducer(estado, { tipo: 'interagir' }, deps())
+
+    expect(resultado.dialogo?.rota).toBe('caravana')
+    expect(resultado.bag).toHaveLength(0)
+  })
+
+  it('não anda com diálogo aberto, porque o herói ouve em vez de andar', () => {
+    const aberto = reducer(comHeroiPerto(criar(), ELFA), { tipo: 'interagir' }, deps())
+
+    const resultado = reducer(aberto, { tipo: 'mover', direcao: 'cima' }, deps())
+
+    expect(resultado.mundo.heroi).toEqual(aberto.mundo.heroi)
+  })
+})
+
+describe('consumível em batalha', () => {
+  const PAO = { id: 'pao-de-viagem', nome: 'Pão de viagem', cura: 10 }
+
+  function comPaoNaBag(estado: EstadoJogo): EstadoJogo {
+    return { ...estado, bag: [PAO] }
+  }
+
+  it('usa o consumível no herói machucado e tira um da bag', () => {
+    const estado = comPaoNaBag(emBatalha(criar()))
+    const ferido = {
+      ...estado,
+      batalha: {
+        ...batalhaDe(estado),
+        unidades: batalhaDe(estado).unidades.map((unidade) =>
+          unidade.ehHeroi ? { ...unidade, vida: Math.floor(unidade.vidaMaxima / 2) } : unidade,
+        ),
+      },
+    }
+
+    const resultado = reducer(
+      ferido,
+      { tipo: 'agir', acao: { tipo: 'usarItem', alvoId: 'heroi', itemId: PAO.id } },
+      deps(SEM_VARIACAO),
+    )
+
+    const heroi = unidadePorId(batalhaDe(resultado), 'heroi')
+    expect(heroi?.vida).toBe(Math.floor((heroi?.vidaMaxima ?? 0) / 2) + PAO.cura)
+    expect(resultado.bag).toHaveLength(0)
+  })
+
+  it('não deixa usar o consumível com a vida cheia', () => {
+    const estado = comPaoNaBag(emBatalha(criar()))
+
+    const resultado = reducer(
+      estado,
+      { tipo: 'agir', acao: { tipo: 'usarItem', alvoId: 'heroi', itemId: PAO.id } },
+      deps(SEM_VARIACAO),
+    )
+
+    expect(resultado.aviso).toBe('Ação indisponível neste turno.')
+    expect(resultado.bag).toHaveLength(1)
+  })
+
+  it('não deixa usar consumível que não está na bag', () => {
+    const estado = emBatalha(criar())
+
+    const resultado = reducer(
+      estado,
+      { tipo: 'agir', acao: { tipo: 'usarItem', alvoId: 'heroi', itemId: 'sopa-de-raiz' } },
+      deps(SEM_VARIACAO),
+    )
+
+    expect(resultado.aviso).toBe('Ação indisponível neste turno.')
+  })
+
+  it('não deixa usar consumível em inimigo', () => {
+    const estado = comPaoNaBag(emBatalha(criar()))
+
+    const resultado = reducer(
+      estado,
+      { tipo: 'agir', acao: { tipo: 'usarItem', alvoId: 'grupo-a-0', itemId: PAO.id } },
+      deps(SEM_VARIACAO),
+    )
+
+    expect(resultado.aviso).toBe('Ação indisponível neste turno.')
+  })
+
+  it('duas poções na bag, usar uma deixa a outra', () => {
+    const estado: EstadoJogo = { ...emBatalha(criar()), bag: [PAO, PAO] }
+    const ferido = {
+      ...estado,
+      batalha: {
+        ...batalhaDe(estado),
+        unidades: batalhaDe(estado).unidades.map((unidade) =>
+          unidade.ehHeroi ? { ...unidade, vida: Math.floor(unidade.vidaMaxima / 2) } : unidade,
+        ),
+      },
+    }
+
+    const resultado = reducer(
+      ferido,
+      { tipo: 'agir', acao: { tipo: 'usarItem', alvoId: 'heroi', itemId: PAO.id } },
+      deps(SEM_VARIACAO),
+    )
+
+    expect(resultado.bag).toHaveLength(1)
+  })
+
+  it('a caixa de opções oferece usar item quando alguém está machucado', () => {
+    const estado = comPaoNaBag(emBatalha(criar()))
+    const ferido = {
+      ...estado,
+      batalha: {
+        ...batalhaDe(estado),
+        unidades: batalhaDe(estado).unidades.map((unidade) =>
+          unidade.ehHeroi ? { ...unidade, vida: Math.floor(unidade.vidaMaxima / 2) } : unidade,
+        ),
+      },
+    }
+
+    expect(acoesDoTurno(ferido)).toContain('usarItem')
+  })
+
+  it('não oferece usar item com a vida cheia', () => {
+    const estado = comPaoNaBag(emBatalha(criar()))
+
+    expect(acoesDoTurno(estado)).not.toContain('usarItem')
+  })
+
+  it('não oferece usar item sem consumível na bag', () => {
+    expect(acoesDoTurno(emBatalha(criar()))).not.toContain('usarItem')
+  })
+})
+
+describe('defesa e esquiva', () => {
+  it('defender dá esquiva e reduz o dano pela metade', () => {
+    const estado = emBatalha(criar())
+    const defesa = reducer(estado, { tipo: 'agir', acao: { tipo: 'defender' } }, deps(SEM_VARIACAO))
+
+    const heroi = unidadePorId(batalhaDe(defesa), 'heroi')
+    expect(heroi?.defendendo).toBe(true)
+    expect(heroi?.esquiva).toBeGreaterThan(0)
+  })
+
+  it('a defesa segura enquanto os outros jogam o turno', () => {
+    let estado = emBatalha(criar())
+    estado = reducer(estado, { tipo: 'agir', acao: { tipo: 'defender' } }, deps(SEM_VARIACAO))
+
+    // Primeiro goblin joga, e a defesa do herói continua valendo.
+    estado = reducer(estado, { tipo: 'agir', acao: { tipo: 'defender' } }, deps(SEM_VARIACAO))
+    expect(unidadePorId(batalhaDe(estado), 'heroi')?.defendendo).toBe(true)
+
+    // Segundo goblin joga, e o turno volta para o herói sem a defesa.
+    estado = reducer(estado, { tipo: 'agir', acao: { tipo: 'defender' } }, deps(SEM_VARIACAO))
+    expect(unidadeAtual(batalhaDe(estado))?.ehHeroi).toBe(true)
+    expect(unidadePorId(batalhaDe(estado), 'heroi')?.defendendo).toBe(false)
+  })
+
+  it('fugir só vale para o herói', () => {
+    const estado = emBatalha(criar())
+
+    expect(acoesDoTurno(estado)).toContain('fugir')
+    expect(reducer(estado, { tipo: 'agir', acao: { tipo: 'fugir' } }, deps()).fase).toBe('retorno')
   })
 })
 

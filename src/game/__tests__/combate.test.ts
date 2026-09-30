@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { derivados, ZERO } from '../atributos'
+import { derivados, VELOCIDADE_BASE, ZERO } from '../atributos'
 import {
   CUSTO_HABILIDADE,
   GOBLIN,
@@ -16,7 +16,6 @@ import {
   unidadeAtual,
   unidadePorId,
 } from '../combate'
-import { sortearDrop } from '../itens'
 import { criarSorteador } from '../random'
 import type { EstadoBatalha, Posicao, Unidade } from '../tipos'
 
@@ -57,7 +56,7 @@ function comVida(batalha: EstadoBatalha, id: string, vida: number): EstadoBatalh
 }
 
 describe('ordem de turnos', () => {
-  it('ordena por velocidade, do mais rápido para o mais lento', () => {
+  it('sempre joga o herói primeiro, e os inimigos na ordem de entrada', () => {
     const batalha = batalhaDeTeste()
     const goblins = batalha.unidades.filter((unidade) => !unidade.ehHeroi)
 
@@ -66,17 +65,17 @@ describe('ordem de turnos', () => {
     expect(batalha.ordem[2]).toBe(goblins[1]?.id)
   })
 
-  it('empate de velocidade resolve por identificador estável', () => {
+  it('não deixa a agilidade da unidade mudar a vez dela', () => {
     const heroi = heroiDeTeste()
-    const empacados = criarUnidadesGoblin('grupo-a', 2, INIMIGOS).map((goblin) => ({
+    const rapidos = criarUnidadesGoblin('grupo-a', 2, INIMIGOS).map((goblin, indice) => ({
       ...goblin,
-      velocidade: heroi.velocidade,
+      esquiva: indice,
     }))
 
-    expect(criarBatalha(heroi, empacados).ordem).toEqual([
+    expect(criarBatalha(heroi, rapidos).ordem).toEqual([
+      'heroi',
       'grupo-a-0',
       'grupo-a-1',
-      'heroi',
     ])
   })
 
@@ -362,14 +361,36 @@ describe('recompensa de vitória', () => {
 
     expect(recompensa.pontosAtributo).toBe(2)
     expect(recompensa.pontosAtributo).toBe(2 * PONTOS_POR_GOBLIN)
-    expect(recompensa.itens).toHaveLength(0)
+    expect(recompensa.loot).toHaveLength(0)
   })
 
-  it('sorteia um drop por goblin derrotado', () => {
+  it('sorteia um drop por goblin derrotado, no chão de quem caiu', () => {
     const encerrada = { ...batalhaDeTeste(), fase: 'vitoria' as const }
-    const recompensa = recompensaVitoria(encerrada, () => sortearDrop(criarSorteador(4)))
+    const recompensa = recompensaVitoria(encerrada, () => ({
+      id: 'espada-de-ferro',
+      nome: 'Espada de ferro',
+      bonus: { forca: 3 },
+    }))
 
-    expect(recompensa.itens.length).toBeLessThanOrEqual(2)
+    expect(recompensa.loot.length).toBeLessThanOrEqual(2)
+    for (const item of recompensa.loot) {
+      const unidade = unidadeDe(encerrada, item.unidadeId)
+      expect(unidade.ehHeroi).toBe(false)
+      expect(unidade.vida).toBe(0)
+      expect(item.pos).toEqual(unidade.pos)
+    }
+  })
+
+  it('dá ponto mesmo quando o goblin não deixou drop', () => {
+    const comMortos: EstadoBatalha = {
+      ...batalhaDeTeste(),
+      fase: 'vitoria' as const,
+      unidades: batalhaDeTeste().unidades.map((unidade) =>
+        unidade.ehHeroi ? unidade : { ...unidade, vida: 0 },
+      ),
+    }
+
+    expect(recompensaVitoria(comMortos, () => null).pontosAtributo).toBe(2 * PONTOS_POR_GOBLIN)
   })
 
   it('não dá ponto quando ninguém caiu', () => {
@@ -414,6 +435,6 @@ describe('unidades', () => {
 
     expect(d.vidaMaxima).toBe(50)
     expect(d.ataqueFisico).toBe(5)
-    expect(d.velocidade).toBe(10)
+    expect(d.velocidadeMovimento).toBe(VELOCIDADE_BASE)
   })
 })

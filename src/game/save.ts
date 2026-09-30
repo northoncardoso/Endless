@@ -1,6 +1,11 @@
+import { VERSAO_SAVE, ehSnapshotValido } from './validacao'
 import type { EstadoBatalha, FaseMissao, Personagem, Posicao, Unidade } from './tipos'
 
-export const VERSAO_SAVE = 1
+export { VERSAO_SAVE }
+
+// Acima disto não é snapshot deste jogo, é lixo ocupando o localStorage. Um
+// snapshot com duas unidades cabe com folga em 4 KiB.
+export const TAMANHO_MAXIMO_SAVE = 4096
 
 export interface SnapshotBatalha {
   versao: number
@@ -42,29 +47,26 @@ export function criarSnapshot(
 
 export function batalhaDoSnapshot(snapshot: Readonly<SnapshotBatalha>): EstadoBatalha {
   const unidades = [snapshot.unidadeHeroi, ...snapshot.unidadesInimigas]
-  const ordem = [...unidades]
-    .sort((a, b) => b.velocidade - a.velocidade || a.id.localeCompare(b.id))
-    .map((unidade) => unidade.id)
-  return { fase: 'ativa', unidades, ordem, indiceTurno: 0 }
+  // Lado fixo, igual a `criarBatalha`: herói primeiro, inimigos na ordem do
+  // snapshot. Reiniciar precisa devolver a mesma ordem, senão o reinício muda a
+  // batalha.
+  return {
+    fase: 'ativa',
+    unidades,
+    ordem: unidades.map((unidade) => unidade.id),
+    indiceTurno: 0,
+  }
 }
 
-function ehObjeto(valor: unknown): valor is Record<string, unknown> {
-  return typeof valor === 'object' && valor !== null
-}
-
-// O save é validado na entrada, não confiado. Um save editado à mão, ou de uma
-// versão antiga, precisa ser descartado sem quebrar o jogo.
-export function ehSnapshotValido(valor: unknown): valor is SnapshotBatalha {
-  if (!ehObjeto(valor)) return false
-  if (valor.versao !== VERSAO_SAVE) return false
-  if (!ehObjeto(valor.personagem)) return false
-  if (!ehObjeto(valor.unidadeHeroi)) return false
-  if (!Array.isArray(valor.unidadesInimigas)) return false
-  return true
-}
-
+// A string vem do localStorage, então é dado externo. Um save editado à mão, de
+// uma versão antiga, ou grande demais para ser snapshot precisa ser descartado
+// sem quebrar o jogo. A regra campo a campo está em `validacao.ts`.
 export function lerSnapshot(serializado: string | null): SnapshotBatalha | null {
-  if (serializado === null) return null
+if (serializado === null) return null
+
+  // A string pode ser enorme, e um payload grande trava a aba no JSON.parse sem
+  // lançar erro, então o tamanho é cortado antes.
+  if (serializado.length > TAMANHO_MAXIMO_SAVE) return null
   try {
     const dado: unknown = JSON.parse(serializado)
     return ehSnapshotValido(dado) ? dado : null

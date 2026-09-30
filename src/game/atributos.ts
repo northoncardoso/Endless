@@ -8,6 +8,11 @@ import type {
 
 export const PONTOS_INICIAIS = 12
 
+// Tiles por segundo. O herói anda 2 tiles por segundo com o derivado zerado, e
+// chega a 6 com os 12 pontos todos em agilidade. Montaria vai multiplicar isto.
+export const VELOCIDADE_BASE = 2
+export const VELOCIDADE_POR_AGILIDADE = 3
+
 export const ZERO: Readonly<PontosAtributo> = Object.freeze({
   forca: 0,
   agilidade: 0,
@@ -42,7 +47,10 @@ export function derivados(
     danoMagico: 6 + i * 3,
     manaMaxima: 20 + i * 5 + (bonus.mana ?? 0),
     regeneracaoMana: i,
-    velocidade: 10 + a,
+    // Velocidade é tiles por segundo no mapa, e não ordem de turno. Agilidade
+    // entra dividida por 3 porque um ponto por ponto deixaria o personagem
+    // rápido demais com os 12 pontos da criação.
+    velocidadeMovimento: VELOCIDADE_BASE + a / VELOCIDADE_POR_AGILIDADE,
   }
 }
 

@@ -7,6 +7,8 @@ import {
   distribuicaoValida,
   pontosUsados,
   PONTOS_INICIAIS,
+  VELOCIDADE_BASE,
+  VELOCIDADE_POR_AGILIDADE,
   ZERO,
 } from '../atributos'
 import { CATALOGO_ITENS } from '../itens'
@@ -22,7 +24,16 @@ describe('derivados', () => {
     expect(d.danoMagico).toBe(6 + 5 * 3)
     expect(d.manaMaxima).toBe(20 + 5 * 5)
     expect(d.regeneracaoMana).toBe(5)
-    expect(d.velocidade).toBe(10 + 4)
+    expect(d.velocidadeMovimento).toBe(VELOCIDADE_BASE + 4 / VELOCIDADE_POR_AGILIDADE)
+  })
+
+  it('mantém a velocidade em tiles por segundo crescida com agilidade', () => {
+    const lento = derivados({ forca: 0, agilidade: 0, inteligencia: 0 })
+    const rapido = derivados({ forca: 0, agilidade: 12, inteligencia: 0 })
+
+    expect(lento.velocidadeMovimento).toBe(2)
+    expect(lento.velocidadeMovimento).toBeLessThan(rapido.velocidadeMovimento)
+    expect(rapido.velocidadeMovimento).toBe(6)
   })
 
   it('soma o bônus do item no atributo antes da fórmula', () => {

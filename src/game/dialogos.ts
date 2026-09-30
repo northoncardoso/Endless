@@ -6,7 +6,7 @@ export const DIALOGOS: Readonly<Record<string, readonly PaginaDialogo[]>> = {
       id: 'caravana-1',
       nome: 'Elfa da caravana',
       texto:
-        'Você veio do reino vizinho sem saber de nada. Settnou há três dias, e o que se prepares para ouvir não é boa notícia.',
+        'Você veio do reino vizinho sem saber de nada. Ninguém te contou nada, e o que vem depois não é boa notícia.',
     },
     {
       id: 'caravana-2',
