@@ -98,6 +98,11 @@ coisa.
 | Dano mágico | `6 + inteligência × 3` |
 | Mana máxima | `20 + inteligência × 5` |
 | Regeneração de mana | `1 × inteligência` por segundo |
+| Velocidade | `10 + agilidade` |
+
+A velocidade foi acrescentada na implementação, porque a ordem de turnos precisa
+de um derivado e a tabela original não tinha nenhum. Agilidade é a resposta:
+força é peso, inteligencia é poder, e o que decide quem age primeiro é o reflexo.
 
 Força aumenta vida e ataque físico. Agilidade aumenta ataque de longo alcance.
 Inteligência aumenta dano mágico, mana e regeneração de mana.
