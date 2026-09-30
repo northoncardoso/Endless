@@ -98,14 +98,29 @@ coisa.
 | Dano mágico | `6 + inteligência × 3` |
 | Mana máxima | `20 + inteligência × 5` |
 | Regeneração de mana | `1 × inteligência` por segundo |
-| Velocidade | `10 + agilidade` |
+| Velocidade de movimento | `2 + agilidade ÷ 3` tiles por segundo |
 
-A velocidade foi acrescentada na implementação, porque a ordem de turnos precisa
-de um derivado e a tabela original não tinha nenhum. Agilidade é a resposta:
-força é peso, inteligencia é poder, e o que decide quem age primeiro é o reflexo.
+A velocidade mede o quanto o personagem anda no mapa, e não a ordem dos turnos.
+Agilidade é a resposta: força é peso, inteligencia é poder, e o que faz o
+personagem ser ágil no mundo é o reflexo. Montarias vão aumentar esse derivado
+depois, o que dá um lugar natural para elas.
 
-Força aumenta vida e ataque físico. Agilidade aumenta ataque de longo alcance.
-Inteligência aumenta dano mágico, mana e regeneração de mana.
+Força aumenta vida e ataque físico. Agilidade aumenta ataque de longo alcance e
+velocidade de movimento. Inteligência aumenta dano mágico, mana e regeneração de
+mana.
+
+### Controles
+
+| Tecla | O que faz |
+|---|---|
+| `A` | um passo para a esquerda |
+| `W` | um passo para frente, que é para cima |
+| `S` | um passo para trás, que é para baixo |
+| `D` | um passo para a direita |
+| `E` | interagir com o que está ao alcance |
+| setas | escolher alvo na batalha, e escolher item no menu |
+| `Enter` ou `Espaço` | confirmar a escolha |
+| `Esc` | fechar o menu, ou sair do diálogo |
 
 ### Especialização, para o futuro
 
@@ -122,6 +137,14 @@ consumir isso:
 
 Catálogo de 6 itens. Cada um soma de 1 a 3 em um atributo, ou vida, ou mana.
 
+Mais 3 consumíveis, que não equipam e somem quando usados:
+
+| Consumível | Cura | Origem |
+|---|---|---|
+| Pão de viagem | 10 | drop de goblin |
+| Gota de mel | 5 | drop de goblin |
+| Sopa de raiz | 20 | NPCs que vendem, no futuro |
+
 - O drop é aleatório, com chance por inimigo.
 - Equipar é feito dentro da bag, sem tela separada de vestimenta.
 - Item equipado soma atributo e, por isso, muda os derivados.
@@ -131,22 +154,48 @@ Todo sorteio passa por um gerador de número aleatório recebido por parâmetro.
 O jogo usa `Math.random`, os testes usam uma semente fixa. É o que faz o drop
 ser testável sem chute.
 
+### Loot no chão
+
+O drop **não vai direto para a bag**. Cada inimigo derrotado deixa o item no
+chão, na posição em que caiu, e o herói pega com `E` quando chega perto. Isso
+transforma a vitória em uma pequena decisão: vale o risco de andar até o loot?
+
+- O item fica visível no chão até ser pego.
+- Pegar o loot é a única forma de levar o item para a bag.
+- Consumível só pode ser usado em batalha, e sai da bag ao ser usado.
+- Item de atributo vai para a bag e pode ser equipado depois.
+
 ## 7. Exploração
 
 - **Mapa:** um único mapa contínuo, da fronteira até a cidade. Sem loading.
 - **Câmera:** o personagem fica no centro e o mundo se move com o comando.
 - **Colisão:** tile sólido contra o jogador, sem engine de física e sem
   pathfinding.
+- **Movimento:** `A`, `W`, `S` e `D`, com passos de um tile, sem aceleração. A
+  velocidade do personagem é a distância em tiles por segundo quando o jogador
+  segura a tecla, e um passo por tecla pressionada quando é um toque.
 - **Goblins:** 2 grupos de 2 goblins, em pontos diferentes do mapa. Cada goblin
   tem um ponto fixo, anda em volta dele num raio de 3 tiles, com pausas, e nunca
   sai desse raio. Nenhum goblin persegue o jogador.
+- **Ritmo do mundo:** vagar é contado em tick, não em segundo. A regra não lê o
+  relógio, porque relógio no meio da regra quebra o teste, então quem desenha
+  chama `passarTempo` 6 vezes por segundo. Um tick move no máximo um tile, e o
+  goblin pausa depois de cada passo.
 - **Gatilho de batalha:** raio de 24 pixels entre herói e goblin.
+- **Interação:** `E` é o único botão de interação, e ele serve para as 3 coisas
+  que o protótipo tem: pegar loot no chão, abrir e avançar diálogo de NPC, e
+  abrir a loja de quem vende. Uma tecla só, porque o jogo é pequeno e o número
+  de coisas que se pode tocar é pequeno.
+- **Prioridade da interação:** quando tem mais de uma coisa ao alcance, o NPC
+  ganha do loot, e o loot mais próximo ganha dos outros. Interação sem alvo
+  mostra "Não há nada aqui", e não faz nada.
 - **Minimapa:** quadrado de 160 pixels no canto superior direito, com 16 pixels
   de margem, sem encostar na borda. Mostra o herói e a marca do objetivo.
   Clicar define um destino, e o herói anda direto, escorregando na parede.
 - **Vida no mapa:** 1 ponto por segundo para cada personagem, fora de batalha.
-- **Depois de fugir ou de vencer:** o goblin volta ao ponto fixo e o herói
-  reaparece a 6 tiles dele, para não haver reencontro automático.
+- **Depois de fugir ou de vencer:** o goblin do grupo é empurrado para longe do
+  herói, até 6 tiles do ponto fixo, para não haver reencontro automático assim
+  que a tela de batalha fecha. O herói fica onde está.
 
 ## 8. Batalha
 
@@ -156,29 +205,60 @@ tempo real.
 - **Cenário:** imagem fixa do local da batalha, jogador à esquerda, inimigos à
   direita. Sem tela de load, só um fade de 0,3s, porque a imagem é fixa e não
   há nada carregando.
-- **Ordem:** por velocidade, cada unidade age uma vez por ciclo. Empate resolve
-  por identificador estável, o que torna a ordem previsível e testável.
+- **Ordem:** lado fixo. O herói age primeiro, depois cada inimigo na ordem em que
+  entraram em campo. Uma volta é um ciclo completo, e a ordem não muda dentro da
+  batalha. A velocidade **não** participa da ordem, porque o protótipo tem um herói
+  e 2 goblins, e com esse número o recurso que cria tensão é a vida, a mana e o
+  item, não a vez de falar. Se o número de inimigos crescer, a issue da grade
+  tática é o lugar de rever isso.
+- **Fila de turnos:** barra no topo com o retrato de cada participante. Quem está
+  agindo fica com a borda acesa e um pulso leve, quem já agiu na volta atual fica
+  apagado, e quem morreu some da fila na hora.
 - **Barras:** barra de vida e número de vida e de mana acima da cabeça de cada
   personagem envolvido. Mana só aparece no mago.
-- **Ações:** atacar, habilidade (custa mana), defender (reduz o dano recebido
-  naquele turno) e fugir.
+- **Ações:** atacar, habilidade (custa mana), usar item (consumível de cura),
+  defender e fugir.
+- **Caixa de opções:** no turno do jogador, abre uma caixa com as 4 ações
+  disponíveis. Só aparece ação que pode ser usada agora, então habilidade sem
+  mana não aparece, e item só aparece se tiver consumível na bag.
+- **Escolha de alvo:** depois de escolher atacar, habilidade ou item, as setas
+  trocam o alvo. Um círculo no chão marca o alvo selecionado, que é o que
+  transforma o alvo em algo visível e não só em texto.
 - **Dano:** valor base mais ou menos 20 por cento, arredondado. Sem dado, a
   variação vem do atributo e do item.
 - **Mana:** sem mana, a habilidade fica indisponível.
+- **Defender:** dá redução de dano de metade e 25 por cento de chance de
+  esquiva contra o próximo ataque inimigo, e o efeito dura só até o próximo turno
+  da própria unidade. No fim do turno seguinte da unidade, a defesa e a esquiva
+  somem sozinhas.
 - **Fuga:** disponível enquanto o herói está vivo. Pergunta "Deseja fugir?" antes
-  do primeiro personagem morrer. Ao fugir, o herói sai da batalha, o goblin
-  volta ao ponto fixo e o herói reaparece a 6 tiles dele.
+  do primeiro personagem morrer. Ao fugir, o herói sai da batalha e o goblin do
+  grupo é empurrado para longe dele.
 - **Derrota:** vida do herói em zero abre uma janela com duas opções: reiniciar
   a batalha, que carrega o snapshot do início dela, ou desistir, que mostra
   "Você foi derrotado" por 5 segundos e volta para a criação de personagem.
-- **Vitória:** drop por goblin, chance aleatória por inimigo, e 1 ponto de
-  atributo livre para o jogador escolher ao voltar ao mapa.
+- **Vitória:** 1 ponto de atributo livre para o jogador escolher ao voltar ao
+  mapa, e o drop de cada goblin deixado no chão, para ser pego com `E`.
 
 ### Save
 
 Snapshot no início de cada batalha: posição, vida, mana, atributos, itens
 equipados e fase da missão. Guardado em memória e em `localStorage`, para o botão
 de reiniciar ser instantâneo e o F5 não quebrar o estado.
+
+O save é **entrada não confiável**, porque `localStorage` é do navegador e o
+jogador mexe. Três defesas, sem biblioteca de schema:
+
+1. Limite de 4 KiB antes do `JSON.parse`, porque parsear payload enorme trava.
+2.só `JSON.parse`. O snapshot inteiro é conferido campo a campo em
+   `src/game/validacao.ts`: versão, fase, identificadores, unidades, atributos e
+   vida dentro dos limites. Qualquer coisa fora é recusada e o jogo abre do
+   começo.
+3. A chave `__proto__` nunca é copiada para dentro de objeto novo, para não haver
+   prototype pollution.
+
+O save é do protótipo, e o contador de versão existe para que uma mudança de
+formato invalide os snapshots antigos em vez de tentar adivinhar.
 
 ## 9. Missão 1, roteiro
 
@@ -236,8 +316,10 @@ roda no CI.
 | `src/game/itens.ts` | catálogo, drop, efeito de equipar |
 | `src/game/combate.ts` | ordem de turnos, ações, dano, fuga, vitória, derrota |
 | `src/game/mapa.ts` | tiles, colisão, vagar dos goblins, gatilho de proximidade |
+| `src/game/mundo.ts` | mapa explorável, NPCs, goblins, loot e interação |
 | `src/game/missoes.ts` | máquina de estados da missão |
 | `src/game/dialogos.ts` | textos como dado |
+| `src/game/validacao.ts` | o que o save precisa ter para ser aceito |
 | `src/game/save.ts` | snapshot do início da batalha |
 | `src/game/estado.ts` | store tipado, com reducer |
 | `src/render/` | Pixi: cena, mundo, câmera, jogador, NPCs, fade |
@@ -270,11 +352,14 @@ Vitest cobre só `src/game/`, porque só `src/game/` é testável sem navegador:
 
 - fórmulas de atributo, com e sem item equipado
 - drop com semente fixa, incluindo a série que prova que a semente importa
-- ordem de turnos, com empate e ciclo completo
-- dano, defesa e mana insuficiente
+- ordem de turnos, com o herói primeiro e o ciclo completo
+- dano, defesa, esquiva e mana insuficiente
+- consumível na batalha, tirando um da bag por uso
 - vitória, derrota, fuga e reinício a partir do snapshot
-- transição da missão e o estado final
-- colisão de tile e o raio de vagar dos goblins
+- loot no chão, diálogo de NPC, prioridade da interação e gatilho de batalha
+- colisão de tile, movimento fluido, raio de vagar e ritmo em tick
+- save adulterado, em `seguranca.test.ts`: versão, campos fora da tabela, vida
+  acima do máximo, `__proto__` e payload grande
 
 CI no GitHub Actions a cada push: `npm ci`, `npm test`, `npm run typecheck` e
 `npm run lint`.
