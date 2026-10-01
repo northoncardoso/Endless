@@ -1,4 +1,4 @@
-import { bonusDe, comPonto, derivados, PONTOS_INICIAIS } from './atributos'
+import { bonusDe, comPonto, derivados, derivadosDoPersonagem, PONTOS_INICIAIS } from './atributos'
 import {
   acoesDisponiveis,
   aplicarAcao,
@@ -11,6 +11,7 @@ import {
 import { dialogoDe } from './dialogos'
 import { CATALOGO_ITENS, buscarItem, sortearDropDeGoblin } from './itens'
 import { FASE_INICIAL, avancarFase } from './missoes'
+import { regenerarVitais, TICKS_VAGAR_POR_SEGUNDO } from './mapa'
 import {
   adicionarLoot,
   alvoInteracao,
@@ -49,6 +50,7 @@ import {
   type Posicao,
   type Raca,
   type Unidade,
+  type Vitais,
 } from './tipos'
 
 export const CHAVE_SAVE = 'endless:batalha'
@@ -134,6 +136,75 @@ function textoDeVitoria(pontos: number, lotes: number): string {
   const lootTexto =
     lotes === 0 ? '' : lotes === 1 ? ' Um item ficou no chão.' : ` ${lotes} itens ficaram no chão.`
   return `Você venceu! Ganhou ${pontosTexto}.${lootTexto}`
+}
+
+// Vitais no máximo, a partir dos pontos e dos itens do personagem. É o que a
+// criação e a Distribuição de ponto usam: na fase de criação o herói ainda não
+// levou dano nenhum, então subir um atributo tem que encher a barra junto, e não
+// deixar o jogador com a vida presa no valor antigo.
+function vitaisCheios(personagem: Readonly<Personagem>): Vitais {
+  const bonus = bonusDe(personagem.itensEquipados, CATALOGO_ITENS)
+  const d = derivados(personagem.pontos, bonus)
+  return { vida: d.vidaMaxima, vidaMaxima: d.vidaMaxima, mana: d.manaMaxima, manaMaxima: d.manaMaxima }
+}
+
+// Recalcula os máximos de vida e mana a partir dos pontos e dos itens, e
+// preserva a vida e a mana que o herói tem agora. Dois casos:
+//
+// 1. O jogador equipou item ou gastou ponto de batalha, então o máximo mudou e a
+//    vida atual só pode subir até ele, nunca descer junto. A vida atual não enche
+//    sozinha: ganhar atributo dá teto, não cura, senão trocar equipamento
+//    viraria uma forma de curar que o balanceamento não pediu.
+// 2. O máximo diminuiu, por exemplo depois de desequipar, e aí a vida e a mana
+//    são cortadas no máximo novo, porque não dá para ter mais vida do que o
+//    corpo aguenta.
+function vitaisDoPersonagem(
+  personagem: Readonly<Personagem>,
+  vitaisAtuais: Readonly<Vitais>,
+): Vitais {
+  const bonus = bonusDe(personagem.itensEquipados, CATALOGO_ITENS)
+  const d = derivados(personagem.pontos, bonus)
+  return {
+    vidaMaxima: d.vidaMaxima,
+    manaMaxima: d.manaMaxima,
+    vida: Math.min(vitaisAtuais.vida, d.vidaMaxima),
+    mana: Math.min(vitaisAtuais.mana, d.manaMaxima),
+  }
+}
+
+// Pega a vida e a mana que o herói saiu da batalha com e devolve para a
+// exploração. A unidade de batalha é a fonte da verdade enquanto a batalha dura,
+// e esta é a ponte que faz o dano de uma batalha chegar na exploração seguinte.
+//
+// Se a batalha vier sem herói, o que é um estado que a regra não produz, o
+// retorno cai nos vitais de antes. Zerar a vida aqui pareceria derrota e mataria
+// o jogador em silêncio.
+function vitaisDoBatalha(
+  batalha: Readonly<EstadoBatalha>,
+  anteriores: Readonly<Vitais>,
+): Vitais {
+  const heroi = batalha.unidades.find((unidade) => unidade.ehHeroi)
+  if (heroi === undefined) return anteriores
+
+  return {
+    vida: heroi.vida,
+    vidaMaxima: heroi.vidaMaxima,
+    mana: heroi.mana,
+    manaMaxima: heroi.manaMaxima,
+  }
+}
+
+// Recalcula os vitais depois que o personagem mudou por causa de item ou de
+// ponto de batalha. É o mesmo caminho de `distribuirPonto`: o máximo sai dos
+// derivados, e a vida e a mana atuais são preservadas até ele.
+function comPersonagemEQVitais(
+  estado: Readonly<EstadoJogo>,
+  personagem: Readonly<Personagem>,
+): Pick<EstadoJogo, 'personagem' | 'mundo'> {
+  return {
+    personagem,
+    mundo: { ...estado.mundo, vitais: vitaisDoPersonagem(personagem, estado.mundo.vitais) },
+  }
 }
 
 // A batalha não vê a bag, ela recebe só a lista do que pode usar agora. Quem
@@ -242,7 +313,7 @@ function reduzirBatalha(
     return comAviso(
       {
         ...fecharBatalha(estado, 'retorno'),
-        mundo,
+        mundo: { ...mundo, vitais: vitaisDoBatalha(proxima, estado.mundo.vitais) },
         bag: bagUsando,
         pontosPendente: estado.pontosPendente + recompensa.pontosAtributo,
       },
@@ -266,7 +337,7 @@ export function reducer(
   switch (acao.tipo) {
     case 'criarPersonagem': {
       const personagem = novoPersonagem(acao.nome, acao.raca, acao.classe)
-      return comAviso({ ...ESTADO_INICIAL, personagem }, null)
+      return comAviso({ ...ESTADO_INICIAL, personagem, mundo: criarMundo(personagem) }, null)
     }
 
     case 'distribuirPonto': {
@@ -278,15 +349,16 @@ export function reducer(
       if (personagem.pontosLivres <= 0) {
         return comAviso(estado, `Os ${PONTOS_INICIAIS} pontos já foram distribuídos.`)
       }
+      const novo = {
+        ...personagem,
+        pontos: comPonto(personagem.pontos, acao.atributo),
+        pontosLivres: personagem.pontosLivres - 1,
+      }
+      // Subir um atributo sobe o máximo de vida ou de mana, então o máximo é
+      // recalculado aqui. Na criação o herói está de vida cheia o tempo todo,
+      // porque ainda não levou dano, então o máximo novo enche a barra.
       return comAviso(
-        {
-          ...estado,
-          personagem: {
-            ...personagem,
-            pontos: comPonto(personagem.pontos, acao.atributo),
-            pontosLivres: personagem.pontosLivres - 1,
-          },
-        },
+        { ...estado, personagem: novo, mundo: { ...estado.mundo, vitais: vitaisCheios(novo) } },
         null,
       )
     }
@@ -338,7 +410,19 @@ export function reducer(
       }
       if (estado.personagem === null) return comAviso(estado, null)
 
-      return avancaMundo(estado, vagarGoblins(estado.mundo, deps.rng), deps)
+      // Regenera os vitais do herói a cada tick. A taxa é por segundo, então um
+      // tick regenera `1 / TICKS_VAGAR_POR_SEGUNDO`, e a inteligência do herói
+      // multiplica a regeneração de mana, como a spec pede. Usa
+      // `derivadosDoPersonagem` para que um item que dá inteligência também
+      // regenere mana, do mesmo jeito que ele aumenta a mana máxima.
+      const vitais = regenerarVitais(
+        estado.mundo.vitais,
+        1 / TICKS_VAGAR_POR_SEGUNDO,
+        derivadosDoPersonagem(estado.personagem, CATALOGO_ITENS).regeneracaoMana,
+      )
+      const mundo = { ...vagarGoblins(estado.mundo, deps.rng), vitais }
+
+      return avancaMundo(estado, mundo, deps)
     }
 
     case 'interagir': {
@@ -386,6 +470,7 @@ export function reducer(
         personagem.classe,
         derivados(personagem.pontos, bonus),
         POSICAO_HEROI_BATALHA,
+        estado.mundo.vitais,
       )
       const inimigos = criarUnidadesGoblin(acao.grupoId, acao.posInimigos.length, acao.posInimigos)
       const batalha = criarBatalha(heroi, inimigos)
@@ -429,10 +514,10 @@ export function reducer(
         {
           ...estado,
           bag: estado.bag.filter((candidato) => candidato.id !== acao.itemId),
-          personagem: {
+          ...comPersonagemEQVitais(estado, {
             ...personagem,
             itensEquipados: [...personagem.itensEquipados, (item as Item).id],
-          },
+          }),
         },
         null,
       )
@@ -450,10 +535,10 @@ export function reducer(
         {
           ...estado,
           bag: item === undefined ? estado.bag : [...estado.bag, item],
-          personagem: {
+          ...comPersonagemEQVitais(estado, {
             ...personagem,
             itensEquipados: personagem.itensEquipados.filter((id) => id !== acao.itemId),
-          },
+          }),
         },
         null,
       )
@@ -474,10 +559,10 @@ export function reducer(
           ...estado,
           fase,
           pontosPendente: pontosRestantes,
-          personagem: {
+          ...comPersonagemEQVitais(estado, {
             ...personagem,
             pontos: comPonto(personagem.pontos, acao.atributo),
-          },
+          }),
         },
         null,
       )

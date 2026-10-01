@@ -21,6 +21,7 @@ import type {
   Npc,
   Personagem,
   Posicao,
+  Vitais,
 } from './tipos'
 
 export const LARGURA_MAPA = 40
@@ -106,11 +107,24 @@ export function criarNpcs(): Npc[] {
   ]
 }
 
-export function criarMundo(): Mundo {
+// Vida e mana iniciais do herói na exploração. Com o personagem já criado, os
+// vitais saem dos derivados dos pontos e dos itens. Sem personagem, cai no
+// corpo base: 50 de vida e 20 de mana, que é o que `derivados` dá com 0 ponto.
+export function vitaisIniciais(personagem?: Readonly<Personagem> | null): Vitais {
+  if (personagem === undefined || personagem === null) {
+    const base = derivados({ forca: 0, agilidade: 0, inteligencia: 0 })
+    return { vida: base.vidaMaxima, vidaMaxima: base.vidaMaxima, mana: base.manaMaxima, manaMaxima: base.manaMaxima }
+  }
+  const d = derivados(personagem.pontos, bonusDe(personagem.itensEquipados, CATALOGO_ITENS))
+  return { vida: d.vidaMaxima, vidaMaxima: d.vidaMaxima, mana: d.manaMaxima, manaMaxima: d.manaMaxima }
+}
+
+export function criarMundo(personagem?: Readonly<Personagem> | null): Mundo {
   return {
     mapa: criarMapa(),
     heroi: { ...POSICAO_HEROI_INICIAL },
     direcaoHeroi: 'baixo',
+    vitais: vitaisIniciais(personagem),
     goblins: GRUPOS_GOBLIN.flatMap((grupo) =>
       grupo.pontos.map((ponto, indice) =>
         criarGoblin(`${grupo.grupoId}-${indice}`, grupo.grupoId, ponto),

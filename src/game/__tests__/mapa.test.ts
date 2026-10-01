@@ -15,12 +15,12 @@ import {
   passo,
   podeOcupar,
   reaparecerAposFuga,
-  regenerarVidaExploracao,
+
   tileDe,
   vagarGoblin,
 } from '../mapa'
 import { criarSorteador } from '../random'
-import type { Goblin, Mapa, Unidade } from '../tipos'
+import type { Goblin, Mapa } from '../tipos'
 
 // Mapa 10 por 10, tudo livre, com uma parede em L no canto direito.
 function mapaDeTeste(): Mapa {
@@ -66,25 +66,6 @@ function goblinDeTeste(sobrescrita: Partial<Goblin> = {}): Goblin {
     direcao: 'baixo',
     pausaRestante: 0,
     ...sobrescrita,
-  }
-}
-
-function unidadeDeTeste(vida: number): Unidade {
-  return {
-    id: 'heroi',
-    nome: 'Herói',
-    pos: { x: 0, y: 0 },
-    vida,
-    vidaMaxima: 100,
-    mana: 0,
-    manaMaxima: 0,
-    ataqueFisico: 10,
-    ataqueDistancia: 10,
-    danoMagico: 10,
-    tipoAtaque: 'fisico',
-    defendendo: false,
-    esquiva: 0,
-    ehHeroi: true,
   }
 }
 
@@ -305,21 +286,5 @@ describe('reaparecer depois da fuga', () => {
     const ponto = reaparecerAposFuga(goblin, mapa)
 
     expect(podeOcupar(mapa, ponto)).toBe(true)
-  })
-})
-
-describe('regeneração na exploração', () => {
-  it('cura 1 por segundo, sem passar da vida máxima', () => {
-    expect(regenerarVidaExploracao(unidadeDeTeste(50), 10).vida).toBe(60)
-    expect(regenerarVidaExploracao(unidadeDeTeste(95), 10).vida).toBe(100)
-  })
-
-  it('não muda nada além da vida', () => {
-    const unidade = unidadeDeTeste(50)
-    const depois = regenerarVidaExploracao(unidade, 3)
-
-    expect(depois.vidaMaxima).toBe(unidade.vidaMaxima)
-    expect(depois.mana).toBe(unidade.mana)
-    expect(depois.pos).toEqual(unidade.pos)
   })
 })
