@@ -259,6 +259,61 @@ describe('vida entre a exploração e a batalha', () => {
   })
 })
 
+describe('aviso da HUD', () => {
+  it('o aviso sobrevive ao tick do mundo, senão a HUD nunca mostra a mensagem', () => {
+    // Regressão: `passarTempo` rodava 6 vezes por segundo e limpava o aviso, e o
+    // `moverFluido` limpava a cada quadro. A mensagem morria em menos de 16ms,
+    // antes de o jogador conseguir ler. Quem tira o aviso da tela é a HUD, com
+    // timer, e não o relógio do mundo.
+    const estado = criado()
+    const comAviso = reducer(estado, { tipo: 'interagir' }, deps())
+    expect(comAviso.aviso).toBe('Não há nada aqui.')
+
+    const depoisDoTick = reducer(comAviso, { tipo: 'passarTempo' }, deps())
+    expect(depoisDoTick.aviso).toBe('Não há nada aqui.')
+
+    const depoisDoMovimento = reducer(
+      comAviso,
+      { tipo: 'moverFluido', direcao: 'direita', dt: 1 / 60 },
+      deps(),
+    )
+    expect(depoisDoMovimento.aviso).toBe('Não há nada aqui.')
+  })
+
+  it('limparAviso tira a mensagem, e é a única coisa que ele faz', () => {
+    const estado = reducer(criado(), { tipo: 'interagir' }, deps())
+    const limpo = reducer(estado, { tipo: 'limparAviso' }, deps())
+
+    expect(limpo.aviso).toBeNull()
+    expect(limpo.mundo).toBe(estado.mundo)
+    expect(limpo.personagem).toBe(estado.personagem)
+    expect(limpo.fase).toBe(estado.fase)
+  })
+
+  it('andando com diálogo aberto, o herói não se mexe e o aviso fica na tela', () => {
+    // O bloqueio de verdade é o diálogo aberto, então o teste chega na caravana,
+    // que fica logo ao lado do ponto de nascimento, e conversa com a elfa.
+    let estado = reducer(criado(), { tipo: 'avancarMissao' }, deps())
+    for (let t = 0; t < 4; t += 1) {
+      estado = reducer(estado, { tipo: 'moverFluido', direcao: 'direita', dt: 1 / 6 }, deps())
+    }
+    for (let t = 0; t < 2; t += 1) {
+      estado = reducer(estado, { tipo: 'moverFluido', direcao: 'cima', dt: 1 / 6 }, deps())
+    }
+    const aberto = reducer(estado, { tipo: 'interagir' }, deps())
+    expect(aberto.dialogo).not.toBeNull()
+
+    const andando = reducer(aberto, { tipo: 'moverFluido', direcao: 'direita', dt: 1 / 60 }, deps())
+    const tique = reducer(aberto, { tipo: 'passarTempo' }, deps())
+
+    // Com o diálogo aberto, o mundo não anda e o estado volta igual, porque o
+    // jogador é quem decide o ritmo. A vida também não regenera aqui.
+    expect(andando).toBe(aberto)
+    expect(tique).toBe(aberto)
+    expect(andando.mundo.vitais).toBe(aberto.mundo.vitais)
+  })
+})
+
 describe('itens e derivação', () => {
   it('o item de vida existe no catálogo, senão os testes de equipar não medem nada', () => {
     expect(CATALOGO_ITENS.some((item) => (item.bonus.vida ?? 0) > 0)).toBe(true)
