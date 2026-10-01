@@ -38,13 +38,13 @@ issues abertas.
 |---|---|
 | Spec de design | pronta e aprovada |
 | Scaffold, CI e lint | pronto |
-| Regras do jogo com teste | prontas, 222 testes |
-| Mundo, interação, NPCs e goblins | regra pronta, falta o desenho |
+| Regras do jogo com teste | prontas, 249 testes |
+| Mundo, câmera e colisão | prontos, verificados no navegador |
+| Tela de criação de personagem | pronta |
 | Save confiável com validação estrita | pronta |
-| Arte do LPC | issue aberta, waiting |
-| Telas de criação, bag e diálogo | issue aberta |
-| Mundo, câmera e minimapa | issue aberta |
-| Tela de batalha | issue aberta |
+| Arte do LPC | issue aberta, aguardando os sprites |
+| Bag, diálogo visual, HUD e minimapa | issue aberta |
+| Tela de batalha e fila de turnos | issue aberta |
 
 O que não existe ainda está listado como issue no repositório, para não virar
 promessa de README. A regra do projeto é simples: um item novo nasce como issue
