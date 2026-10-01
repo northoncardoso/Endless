@@ -37,6 +37,17 @@ canvas {
   position: relative;
 }
 
+/* `.area` é o palco mais as camadas de cima, HUD e diálogo. Ela é o
+   posicionador: as camadas ficam presas ao palco e não à página, senão as barras
+   desceriam por cima do rodapé de dicas. */
+
+.area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
 .palco {
   flex: 1;
   min-height: 0;
@@ -169,4 +180,122 @@ button:disabled {
 .criacao__resumo {
   color: var(--suave);
   font-size: 14px;
+}
+
+/* HUD e diálogo são position absolute e não ocupam fluxo: se ocupassem,
+   empurrariam o canvas e a câmera desalinharia do mundo. A `.hud` cobre a área
+   toda e não recebe clique, para o mouse atravessar até o canvas. */
+
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hud__aviso {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(520px, calc(100% - 32px));
+  margin: 0;
+  padding: 8px 14px;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  background: #10131aee;
+  color: var(--texto);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* As barras ficam no canto superior esquerdo, que é onde o jogador olha primeiro
+   e onde o diálogo embaixo não passa por cima. */
+.hud__barras {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(220px, calc(100% - 32px));
+  padding: 10px 12px;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  background: #10131acc;
+}
+
+.hud__barra {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.hud__barraNome,
+.hud__barraNumero {
+  color: var(--suave);
+}
+
+.hud__barraNumero {
+  font-variant-numeric: tabular-nums;
+}
+
+.hud__barraTrilho {
+  height: 10px;
+  border: 1px solid var(--borda);
+  border-radius: 3px;
+  background: #0b0d12;
+  overflow: hidden;
+}
+
+.hud__barraPreenchida {
+  height: 100%;
+  transition: width 120ms linear;
+}
+
+.hud__barra--vida .hud__barraPreenchida {
+  background: #b3402f;
+}
+
+.hud__barra--mana .hud__barraPreenchida {
+  background: #3a6ea5;
+}
+
+.dialogo {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: min(560px, calc(100% - 32px));
+  padding: 12px 16px;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  background: #10131af0;
+}
+
+.dialogo__nome {
+  margin: 0 0 6px;
+  color: var(--acento);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dialogo__texto {
+  margin: 0;
+}
+
+.dialogo__acoes {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* Em tela estreita o aviso de topo entraria em cima das barras, então ele desce
+   para baixo delas. O jogo é pensado para desktop, mas o celular não pode ficar
+   com texto por cima de texto. */
+@media (max-width: 620px) {
+  .hud__aviso {
+    top: 92px;
+  }
 }

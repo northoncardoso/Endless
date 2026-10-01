@@ -80,6 +80,7 @@ export type AcaoJogo =
   | { tipo: 'interagir' }
   | { tipo: 'avancarDialogo' }
   | { tipo: 'fecharDialogo' }
+  | { tipo: 'limparAviso' }
   | { tipo: 'iniciarBatalha'; grupoId: string; posInimigos: readonly Posicao[] }
   | { tipo: 'agir'; acao: AcaoBatalha }
   | { tipo: 'reiniciarBatalha' }
@@ -253,22 +254,23 @@ export function acoesDoTurno(estado: Readonly<EstadoJogo>): AcaoBatalha['tipo'][
 // Quando o herói chega perto de um grupo de goblin, a batalha começa. O mesmo
 // gatilho vale para passo discreto e para movimento contínuo, então a regra
 // fica num lugar só.
+//
+// Esta função não mexe no aviso. Ela roda a cada quadro de movimento, e limpar o
+// aviso aqui apagava a mensagem do jogador no mesmo quadro em que ela nasceu. O
+// aviso sai da tela pela ação `limparAviso`, que a HUD dispara com timer.
 function avancaMundo(estado: EstadoJogo, mundo: Mundo, deps: Dependencias): EstadoJogo {
-  if (mundo === estado.mundo) return comAviso(estado, null)
+  if (mundo === estado.mundo) return estado
 
   const grupo = grupoEmAlcance(mundo)
   if (grupo !== null && estado.fase !== 'cidade') {
-    return comAviso(
-      reducer(
-        { ...estado, mundo },
-        { tipo: 'iniciarBatalha', grupoId: grupo.grupoId, posInimigos: grupo.posInimigos },
-        deps,
-      ),
-      null,
+    return reducer(
+      { ...estado, mundo },
+      { tipo: 'iniciarBatalha', grupoId: grupo.grupoId, posInimigos: grupo.posInimigos },
+      deps,
     )
   }
 
-  return comAviso({ ...estado, mundo }, null)
+  return { ...estado, mundo }
 }
 
 function reduzirBatalha(
@@ -387,9 +389,13 @@ export function reducer(
     case 'moverFluido': {
       const personagem = estado.personagem
       if (personagem === null) return comAviso(estado, 'Sem personagem.')
-      if (acao.dt <= 0) return comAviso(estado, null)
-      if (estado.dialogo !== null) return comAviso(estado, null)
-      if (estado.batalha !== null) return comAviso(estado, null)
+      // Estas três saídas devolvem o estado como está, sem mexer no aviso. Antes
+      // elas limpavam o aviso, e isso quebrava a HUD: `moverFluido` roda a cada
+      // quadro, então um aviso que o jogador precisava ler sumia em menos de 16ms.
+      // Movimento bloqueado não é motivo para apagar mensagem.
+      if (acao.dt <= 0) return estado
+      if (estado.dialogo !== null) return estado
+      if (estado.batalha !== null) return estado
 
       const movido = moverHeroiFluido(
         estado.mundo,
@@ -405,10 +411,14 @@ export function reducer(
       // `TICKS_VAGAR_POR_SEGUNDO` vezes por segundo. O tempo do mundo só anda
       // fora de batalha e fora de diálogo, porque neles quem decide o ritmo é
       // o jogador.
+      //
+      // Estas saídas também preservam o aviso, pelo mesmo motivo de `moverFluido`:
+      // o tick chega 6 vezes por segundo e limpava a mensagem antes de ela poder
+      // ser lida. Quem tira o aviso da tela é a ação `limparAviso`.
       if (estado.batalha !== null || estado.dialogo !== null) {
-        return comAviso(estado, null)
+        return estado
       }
-      if (estado.personagem === null) return comAviso(estado, null)
+      if (estado.personagem === null) return estado
 
       // Regenera os vitais do herói a cada tick. A taxa é por segundo, então um
       // tick regenera `1 / TICKS_VAGAR_POR_SEGUNDO`, e a inteligência do herói
@@ -456,6 +466,12 @@ export function reducer(
 
     case 'fecharDialogo':
       return comAviso({ ...estado, dialogo: null }, null)
+
+    // A HUD esconde o aviso depois de um tempo, e esconder é mexer no estado, então
+    // o pedido de limpar vem por ação. A tela decide QUANDO, e a regra decide O
+    // QUE, que é a divisão do projeto.
+    case 'limparAviso':
+      return comAviso(estado, null)
 
     case 'iniciarBatalha': {
       const personagem = estado.personagem

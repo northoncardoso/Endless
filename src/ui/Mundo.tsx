@@ -12,6 +12,8 @@ import { criarSorteador } from '../game/random'
 import { criarArmazenamentoLocal, criarArmazenamentoMemoria } from '../game/save'
 import { criarCena, type Cena } from '../render/cena'
 import { CriacaoPersonagem } from './CriacaoPersonagem'
+import { Dialogo } from './Dialogo'
+import { HUD } from './HUD'
 import { calcularTicks } from './relogio'
 import { acaoDeTecla, direcaoDasTeclas, ehTeclaDeMovimento } from './teclado'
 
@@ -140,10 +142,21 @@ export function Mundo() {
   // O palco fica montado o tempo todo, e a tela de criação vem por cima. Se o
   // palco só existisse na fase de exploração, o efeito que cria a cena rodaria
   // uma vez com o elemento ainda ausente e o canvas nunca apareceria.
+  //
+  // A HUD e o diálogo ficam dentro de `.area`, que cobre só o palco, e não a
+  // página inteira. Se eles cobrissem o app todo, as barras desceriam por cima do
+  // rodapé de dicas, que é a única parte da tela que o jogador precisa ler.
   return (
-    <>
+    <div className="area">
       <div ref={palco} className="palco" />
-      {estado.fase === 'criacao' && <CriacaoPersonagem estado={estado} despachar={despachar} />}
-    </>
+      {estado.fase === 'criacao' ? (
+        <CriacaoPersonagem estado={estado} despachar={despachar} />
+      ) : (
+        <>
+          <HUD estado={estado} despachar={despachar} />
+          <Dialogo estado={estado} despachar={despachar} />
+        </>
+      )}
+    </div>
   )
 }
