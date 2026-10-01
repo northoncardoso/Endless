@@ -29,3 +29,144 @@ canvas {
   display: block;
   image-rendering: pixelated;
 }
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  position: relative;
+}
+
+.palco {
+  flex: 1;
+  min-height: 0;
+  background: #3d6630;
+}
+
+.criacao {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  background: #10131aee;
+  backdrop-filter: blur(2px);
+}
+
+.rodape {
+  padding: 8px 16px;
+  border-top: 1px solid var(--borda);
+  color: var(--suave);
+  font-size: 14px;
+}
+
+.rodape p {
+  margin: 0;
+}
+
+.criacao > * {
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.criacao {
+  padding: 32px 16px 48px;
+}
+
+.criacao h1 {
+  margin: 0;
+  font-size: 32px;
+  letter-spacing: 0.08em;
+}
+
+.criacao__frase {
+  color: var(--suave);
+  margin-top: 4px;
+}
+
+.criacao fieldset {
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  margin: 20px 0;
+  padding: 12px 16px 16px;
+}
+
+.criacao legend {
+  color: var(--suave);
+  padding: 0 6px;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 20px;
+}
+
+.campo input {
+  background: #171b24;
+  border: 1px solid var(--borda);
+  border-radius: 4px;
+  color: inherit;
+  font: inherit;
+  padding: 8px 10px;
+}
+
+.opcao {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  display: grid;
+  gap: 4px 10px;
+  grid-template-columns: auto 120px 1fr;
+  padding: 8px;
+}
+
+.opcao--ativa {
+  border-color: var(--acento);
+}
+
+.opcao span {
+  color: var(--suave);
+  font-size: 14px;
+}
+
+.ponto {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.ponto span {
+  color: var(--suave);
+}
+
+button {
+  background: #1d2330;
+  border: 1px solid var(--borda);
+  border-radius: 4px;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 8px 12px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.principal {
+  background: var(--acento);
+  border-color: var(--acento);
+  color: #1b1b1f;
+  font-weight: 600;
+  padding: 10px 18px;
+}
+
+.criacao__resumo {
+  color: var(--suave);
+  font-size: 14px;
+}

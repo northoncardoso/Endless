@@ -1,8 +1,12 @@
+import { Mundo } from './ui/Mundo'
+
 function App() {
   return (
-    <main>
-      <h1>Endless</h1>
-      <p>Protótipo em construção. O design está em docs/superpowers/specs.</p>
+    <main className="app">
+      <Mundo />
+      <footer className="rodape">
+        <p>A, W, S, D para andar. E para interagir. Em construção.</p>
+      </footer>
     </main>
   )
 }
