@@ -9,6 +9,7 @@ import type {
   ItemDaBag,
   Posicao,
   Unidade,
+  Vitais,
 } from './tipos'
 
 export const CUSTO_HABILIDADE = 8
@@ -68,14 +69,18 @@ export function criarUnidadeHeroi(
   classe: Classe,
   derivados: Derivados,
   pos: { x: number; y: number },
+  vitais?: Readonly<Vitais>,
 ): Unidade {
   return {
     id,
     nome,
     pos,
-    vida: derivados.vidaMaxima,
+    // Sem vitais informados, a unidade começa cheia, que é o caso de teste e o
+    // primeiro uso. Com vitais, a batalha começa com o que o heroi carrega da
+    // exploração, e é assim que o dano de uma batalha chega na próxima.
+    vida: vitais?.vida ?? derivados.vidaMaxima,
     vidaMaxima: derivados.vidaMaxima,
-    mana: derivados.manaMaxima,
+    mana: vitais?.mana ?? derivados.manaMaxima,
     manaMaxima: derivados.manaMaxima,
     ataqueFisico: derivados.ataqueFisico,
     ataqueDistancia: derivados.ataqueDistancia,

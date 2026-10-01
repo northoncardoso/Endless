@@ -158,10 +158,25 @@ export type AlvoInteracao =
   | { tipo: 'npc'; npc: Npc }
   | { tipo: 'loot'; lote: LoteChao }
 
+// Vida e mana que o herói carrega enquanto anda pelo mapa. São os números que a
+// HUD mostra e que sobrevivem à batalha: entrar em batalha leva estes valores, e
+// o que sobrar da batalha volta para estes.
+//
+// Não é a `Unidade` de combate de propósito. A unidade tem campo de batalha, tipo
+// de ataque, defendendo e esquiva, e nada disso faz sentido enquanto o herói
+// está só andando. Separar os dois também impede o turno vazar para a exploração.
+export interface Vitais {
+  vida: number
+  vidaMaxima: number
+  mana: number
+  manaMaxima: number
+}
+
 export interface Mundo {
   mapa: Mapa
   heroi: Posicao
   direcaoHeroi: Direcao
+  vitais: Vitais
   goblins: Goblin[]
   npcs: Npc[]
   loot: LoteChao[]

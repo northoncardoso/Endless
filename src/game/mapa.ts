@@ -1,6 +1,6 @@
 import type { Sorteador } from './random'
 import { sortear } from './random'
-import type { Direcao, Goblin, Mapa, Posicao, Unidade } from './tipos'
+import type { Direcao, Goblin, Mapa, Posicao, Vitais } from './tipos'
 
 export const TAMANHO_TILE = 16
 export const RAIO_GATILHO_PIXELS = 24
@@ -13,6 +13,8 @@ export const TICKS_VAGAR_POR_SEGUNDO = 6
 // Cada pausa dura 3 ticks, porque PASSOS_ANTES_PAUSA conta o tick em que o
 // goblin bateu na borda mais os dois seguintes parados.
 export const PASSOS_ANTES_PAUSA = 2
+// Regeneração fora de batalha, por segundo. A spec pede 1 ponto de vida por
+// segundo, e 1 ponto de mana por ponto de inteligência por segundo.
 export const REGENERACAO_VIDE_POR_SEGUNDO = 1
 
 export const DIRECOES: readonly Direcao[] = [
@@ -187,10 +189,20 @@ export function reaparecerAposFuga(
   return goblin.pos
 }
 
-export function regenerarVidaExploracao(
-  unidade: Readonly<Unidade>,
+// Regeneração dos vitais de exploração. A vida sobe `segundos` pontos, e a mana
+// sobe `segundos` vezes a inteligência, que é a taxa que a spec pede. Nenhum dos
+// dois passa do máximo, e um tempo negativo não regenera nada, para um `dt`
+// grande demais não curar o herói de volta ao cheio sem querer.
+export function regenerarVitais(
+  vitais: Readonly<Vitais>,
   segundos: number,
-): Unidade {
-  const curado = Math.min(unidade.vidaMaxima, unidade.vida + segundos * REGENERACAO_VIDE_POR_SEGUNDO)
-  return { ...unidade, vida: curado }
+  inteligencia: number,
+): Vitais {
+  if (segundos <= 0) return vitais
+
+  return {
+    ...vitais,
+    vida: Math.min(vitais.vidaMaxima, vitais.vida + segundos * REGENERACAO_VIDE_POR_SEGUNDO),
+    mana: Math.min(vitais.manaMaxima, vitais.mana + segundos * inteligencia),
+  }
 }

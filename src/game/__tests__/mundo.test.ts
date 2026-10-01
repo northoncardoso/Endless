@@ -53,6 +53,7 @@ function mundoDeTeste(overrides: Partial<Mundo> = {}): Mundo {
     mapa: mapaAberto(),
     heroi: { x: 8 * TAMANHO_TILE, y: 8 * TAMANHO_TILE },
     direcaoHeroi: 'baixo',
+    vitais: { vida: 50, vidaMaxima: 50, mana: 20, manaMaxima: 20 },
     goblins: [],
     npcs: [],
     loot: [],
