@@ -16,7 +16,7 @@ O design completo, incluindo o que ficou de fora e por quê, está em
 Você é um mensageiro de um reino vizinho que chega na fronteira sem saber de
 nada. A caravana de elfos da resistência conta a história e dá a missão: chegar
 até a Rainha Kassandra. No caminho, 2 goblins. Na cidade, a Rainha abre a
-mensagem, e você descobre que é filho bastardo do mártir que está renascendo, e
+mensagem, e você descobre que é filho bastardo de um maligno mártir que está renascendo, e
 que a profecia de 100 anos diz que só você pode matá-lo.
 
 ## Como rodar
