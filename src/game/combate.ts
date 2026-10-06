@@ -292,6 +292,31 @@ export function proximoAlvo(
   return alvos[proximo]?.id ?? null
 }
 
+// O que a unidade faz quando não é o jogador quem decide. No protótipo o único
+// caso é o goblin, e ele ataca o herói, que é o único aliado em campo. Ficar aqui,
+// e não na tela, é o que deixa o turno do inimigo testável com semente.
+//
+// Devolve `null` quando não é vez de uma unidade controlada pela máquina, e quem
+// chama trata isso como "não há turno automático agora".
+export function acaoAutomatica(batalha: Readonly<EstadoBatalha>): AcaoBatalha | null {
+  const unidade = unidadeAtual(batalha)
+  if (unidade === undefined || unidade.ehHeroi) return null
+
+  const heroi = batalha.unidades.find((outra) => outra.ehHeroi && outra.vida > 0)
+  if (heroi === undefined) return null
+
+  return { tipo: 'atacar', alvoId: heroi.id }
+}
+
+// Quem já agiu na volta atual. A ordem é fixa e o índice do turno só anda para
+// frente dentro do ciclo, então quem está antes do índice já agiu e quem está
+// depois ainda vai agir. Quando o índice volta para o começo, a volta recomeça e
+// ninguém agiu ainda, que é o que a fila de turnos da tela mostra.
+export function jaAgiuNaVolta(batalha: Readonly<EstadoBatalha>, id: string): boolean {
+  const indice = batalha.ordem.indexOf(id)
+  return indice >= 0 && indice < batalha.indiceTurno
+}
+
 type DanoAplicado =
   | { estado: EstadoBatalha; esquivou: false; dano: number }
   | { estado: EstadoBatalha; esquivou: true; dano: 0 }
