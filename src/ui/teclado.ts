@@ -22,6 +22,20 @@ export function ehTeclaDeMovimento(code: string): boolean {
   return DIRECOES[code] !== undefined
 }
 
+// Só as setas, e sem as letras. Na batalha as setas trocam alvo e as letras não
+// existem, então as duas telas não brigam pela tecla: só uma delas está montada,
+// e a exploração some enquanto a batalha está na tela.
+const SELECAO: Readonly<Record<string, Direcao>> = {
+  ArrowLeft: 'esquerda',
+  ArrowRight: 'direita',
+  ArrowUp: 'cima',
+  ArrowDown: 'baixo',
+}
+
+export function direcaoDeSelecao(code: string): Direcao | null {
+  return SELECAO[code] ?? null
+}
+
 // Direção atual a partir das teclas pressionadas. `null` é ninguém pressionado,
 // e é o que faz o herói parar. A ordem é fixa para que duas teclas opostas ao
 // mesmo tempo não troquem de direção a cada quadro.

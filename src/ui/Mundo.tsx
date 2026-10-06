@@ -1,5 +1,4 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
-import { TICKS_VAGAR_POR_SEGUNDO } from '../game/mapa'
 import {
   CHAVE_SAVE,
   ESTADO_INICIAL,
@@ -10,12 +9,10 @@ import {
 } from '../game/estado'
 import { criarSorteador } from '../game/random'
 import { criarArmazenamentoLocal, criarArmazenamentoMemoria } from '../game/save'
-import { criarCena, type Cena } from '../render/cena'
+import { Batalha } from './Batalha'
 import { CriacaoPersonagem } from './CriacaoPersonagem'
 import { Dialogo } from './Dialogo'
 import { HUD } from './HUD'
-import { calcularTicks } from './relogio'
-import { acaoDeTecla, direcaoDasTeclas, ehTeclaDeMovimento } from './teclado'
 
 // Componente temporário até a issue 2 montar as telas de verdade. Aqui só o que
 // liga a cena do Pixi ao estado do jogo: guardar o estado, transformar tecla em
@@ -26,7 +23,6 @@ export function Mundo() {
   const palco = useRef<HTMLDivElement>(null)
   const cena = useRef<Cena | null>(null)
   const teclas = useRef(new Set<string>())
-  const acumulado = useRef(0)
   const estadoRef = useRef<EstadoJogo>(ESTADO_INICIAL)
 
   // O `reducer` do jogo recebe as dependências, e elas nascem uma vez só: um
@@ -46,6 +42,11 @@ export function Mundo() {
     ESTADO_INICIAL,
   )
 
+  // A unidade que o círculo no chão está marcando. Vive aqui, e não dentro da tela
+  // de batalha, porque quem desenha o círculo é a cena do Pixi e quem sabe o que
+  // está selecionado é a caixa de opções: as duas conversam por cima deste estado.
+  const [alvoSelecionado, setAlvoSelecionado] = useState<string | null>(null)
+
   // O laço de desenho não pode despachar a cada quadro sem redesenhar, senão o
   // goblin andaria e o jogador veria o mundo um tick atrasado. Aqui a regra
   // avança, e o efeito abaixo é que leva o estado novo para a cena.
@@ -54,66 +55,18 @@ export function Mundo() {
   }, [estado])
 
   useEffect(() => {
-    const elemento = palco.current
-    if (elemento === null) return
-
-    let viva = true
-    let montada: Cena | null = null
-    // O `resizeTo` do Pixi já cuida do renderer quando a janela muda, mas o
-    // retângulo do fade é nosso: sem esta observação, o fade ficaria do tamanho
-    // antigo da tela depois de um redimensionamento.
-    const observador = new ResizeObserver((entradas) => {
-      const caixa = entradas[0]?.contentRect
-      if (caixa === undefined) return
-      montada?.redimensionar(caixa.width, caixa.height)
-    })
-    observador.observe(elemento)
-
-    function quadro(segundos: number): void {
-      if (montada === null) return
-
-      const direcao = direcaoDasTeclas(teclas.current)
-      // Sem tecla nenhuma não há o que despachar. Despachar mesmo assim devolvia
-      // estado novo a 60 quadros por segundo e o React redesenhava a tela
-      // inteira sem nada ter mudado.
-      if (direcao !== null) despachar({ tipo: 'moverFluido', direcao, dt: segundos })
-
-      const relogio = calcularTicks(acumulado.current, segundos, TICKS_VAGAR_POR_SEGUNDO)
-      acumulado.current = relogio.acumulado
-      for (let i = 0; i < relogio.ticks; i += 1) despachar({ tipo: 'passarTempo' })
-    }
-
-    void criarCena(elemento).then((c) => {
-      if (!viva) {
-        c.destruir()
-        return
-      }
-      montada = c
-      cena.current = c
-      c.aoQuadro(quadro)
-      // O primeiro desenho acontece aqui, e não no efeito de estado: este
-      // efeito roda antes de a cena existir, porque criar a cena é assíncrono.
-      c.desenhar(estadoRef.current, null)
-      void c.entrar()
-    })
-
-    return () => {
-      viva = false
-      observador.disconnect()
-      montada?.destruir()
-      cena.current = null
-    }
-  }, [])
-
-  useEffect(() => {
-    cena.current?.desenhar(estado, null)
-  }, [estado])
+    cena.current?.desenhar(estado, alvoSelecionado)
+  }, [estado, alvoSelecionado])
 
   useEffect(() => {
     function aoPressionar(evento: KeyboardEvent): void {
+      // Em batalha as setas são da caixa de opções e as letras de movimento não
+      // existem. A tecla que anda é a mesma, então o filtro é por fase: se
+      // deixasse passar, o herói andaria com a seta que o jogador acabou de usar
+      // para escolher o alvo.
       if (ehTeclaDeMovimento(evento.code)) {
-        teclas.current.add(evento.code)
         evento.preventDefault()
+        if (estadoRef.current.batalha === null) teclas.current.add(evento.code)
         return
       }
 
@@ -151,6 +104,16 @@ export function Mundo() {
       <div ref={palco} className="palco" />
       {estado.fase === 'criacao' ? (
         <CriacaoPersonagem estado={estado} despachar={despachar} />
+      ) : estado.fase === 'batalha' ? (
+        <>
+          <Batalha
+            estado={estado}
+            despachar={despachar}
+            alvoSelecionado={alvoSelecionado}
+            selecionarAlvo={setAlvoSelecionado}
+          />
+          <Dialogo estado={estado} despachar={despachar} />
+        </>
       ) : (
         <>
           <HUD estado={estado} despachar={despachar} />

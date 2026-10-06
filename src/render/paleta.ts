@@ -21,6 +21,17 @@ export const PALETA = {
   lootBrilho: 0xffe9a0,
   alvo: 0xf2f2f2,
   fade: 0x0a0a0c,
+  texto: 0xe8e6e3,
+  defesa: 0xc9a227,
+  batalhaCeu: 0x1b2430,
+  batalhaMorro: 0x2b3844,
+  batalhaPedra: 0x3d4c5a,
+  batalhaTerra: 0x5a4632,
+  batalhaChao: 0x74604a,
+  batalhaVida: 0xb3402f,
+  batalhaMana: 0x3a6ea5,
+  batalhaBarra: 0x0b0d12,
+  batalhaBorda: 0xc9a227,
 } as const
 
 // A ficha do LPC é 64 por 64. O placeholder é menor, mas usa as mesmas

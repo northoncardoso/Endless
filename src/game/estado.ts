@@ -1,11 +1,13 @@
 import { bonusDe, comPonto, derivados, derivadosDoPersonagem, PONTOS_INICIAIS } from './atributos'
 import {
+  acaoAutomatica,
   acoesDisponiveis,
   aplicarAcao,
   criarBatalha,
   criarUnidadeHeroi,
   criarUnidadesGoblin,
   recompensaVitoria,
+  unidadeAtual as unidadeDoTurno,
   type ItensUsaveis,
 } from './combate'
 import { dialogoDe } from './dialogos'
@@ -49,7 +51,6 @@ import {
   type PontosAtributo,
   type Posicao,
   type Raca,
-  type Unidade,
   type Vitais,
 } from './tipos'
 
@@ -83,6 +84,7 @@ export type AcaoJogo =
   | { tipo: 'limparAviso' }
   | { tipo: 'iniciarBatalha'; grupoId: string; posInimigos: readonly Posicao[] }
   | { tipo: 'agir'; acao: AcaoBatalha }
+  | { tipo: 'turnoInimigo' }
   | { tipo: 'reiniciarBatalha' }
   | { tipo: 'abandonarBatalha' }
   | { tipo: 'equipar'; itemId: string }
@@ -234,19 +236,12 @@ function consumirItem(bag: readonly ItemDaBag[], itemId: string): ItemDaBag[] {
   return restante
 }
 
-// Quem joga agora. A batalha nunca fica parada num morto, então procurar o id da
-// ordem na posição atual é seguro mesmo depois de um ataque fatal.
-function unidadeAtual(batalha: Readonly<EstadoBatalha>): Unidade | undefined {
-  const id = batalha.ordem[batalha.indiceTurno]
-  return batalha.unidades.find((unidade) => unidade.id === id && unidade.vida > 0)
-}
-
 // Ações que a caixa de opções mostra no turno atual. A UI chama isso em vez de
 // repetir a regra, para a caixa e a batalha nunca discordarem.
 export function acoesDoTurno(estado: Readonly<EstadoJogo>): AcaoBatalha['tipo'][] {
   const batalha = estado.batalha
   if (batalha === null) return []
-  const unidade = unidadeAtual(batalha)
+  const unidade = unidadeDoTurno(batalha)
   if (unidade === undefined) return []
   return acoesDisponiveis(batalha, unidade, itensUsaveis(estado))
 }
@@ -438,6 +433,12 @@ export function reducer(
     case 'interagir': {
       if (estado.personagem === null) return comAviso(estado, 'Sem personagem.')
 
+      // Em batalha a tecla E não pega loot nem abre diálogo. Sem este guard, o
+      // herói podia recolher o drop que estava no chão ao lado do goblin, e a
+      // batalha viraria uma forma de teleportar item para a bag. Devolve o estado
+      // como está, sem mexer no aviso, pelo mesmo motivo de `moverFluido`.
+      if (estado.batalha !== null) return estado
+
       if (estado.dialogo !== null) return proximoDialogo(estado)
 
       const alvo = alvoInteracao(estado.mundo)
@@ -501,6 +502,19 @@ export function reducer(
 
     case 'agir':
       return reduzirBatalha(estado, acao.acao, deps)
+
+    // O turno do inimigo é uma ação, e não um efeito: quem despacha é a tela,
+    // porque é ela que mostra a fila de turnos avançando. A regra do que o
+    // goblin decide fica em `acaoAutomatica`, e o sorteio continua aqui, com o
+    // gerador injetado. Uma tela que não understandesse nada de combate ainda
+    // teria o turno do goblin inteiro.
+    case 'turnoInimigo': {
+      const batalha = estado.batalha
+      if (batalha === null || batalha.fase !== 'ativa') return estado
+      const acao = acaoAutomatica(batalha)
+      if (acao === null) return estado
+      return reduzirBatalha(estado, acao, deps)
+    }
 
     case 'reiniciarBatalha': {
       const snapshot = estado.snapshot ?? lerSnapshot(deps.armazenamento.ler())
