@@ -31,11 +31,48 @@ export type AtributoEquipavel =
 
 export type BonusEquipado = Partial<Record<AtributoEquipavel, number>>
 
+export type TipoEquipavel =
+  | 'cabeca'
+  | 'colar'
+  | 'anel'
+  | 'ombro'
+  | 'torso'
+  | 'pulso'
+  | 'mao'
+  | 'cintura'
+  | 'perna'
+  | 'pe'
+  | 'arma'
+  | 'secundaria'
+  | 'ambos'
+
+export type RequisitoClasse = 'qualquer' | Classe
+
 export interface Item {
   id: string
   nome: string
   bonus: BonusEquipado
+  tipo?: TipoEquipavel
+  slot?: SlotEquipamento
+  requeridoClasse?: RequisitoClasse
+  nivelRequerido?: number
+  nivel?: number
 }
+
+export type SlotEquipamento =
+  | 'cabeca'
+  | 'colar'
+  | 'anel1'
+  | 'anel2'
+  | 'ombro'
+  | 'torso'
+  | 'pulso'
+  | 'mao'
+  | 'cintura'
+  | 'perna'
+  | 'pe'
+  | 'arma'
+  | 'secundaria'
 
 // Consumível não equipa: soma vida na hora de usar e some da bag. A cura é
 // escrita aqui, e não vem do catálogo de atributos, porque comida não dá força.
@@ -60,6 +97,8 @@ export interface Personagem {
   pontos: PontosAtributo
   itensEquipados: string[]
   pontosLivres: number
+  equipamentos?: Partial<Record<SlotEquipamento, string>>
+  nivel?: number
 }
 
 export interface Posicao {

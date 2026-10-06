@@ -390,3 +390,105 @@ button:disabled {
   margin: 0;
   font-size: 20px;
 }
+
+.bag {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: min(320px, calc(100% - 32px));
+  max-height: calc(100vh - 160px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  background: #10131af0;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+  z-index: 10;
+}
+
+.bag__titulo {
+  font-weight: 600;
+  color: var(--acento);
+  margin-bottom: 6px;
+}
+
+.bag__slots {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.bag__slot {
+  border: 1px solid var(--borda);
+  border-radius: 4px;
+  padding: 4px 6px;
+  background: #0f1320f0;
+  min-height: 36px;
+}
+
+.bag__slotLabel {
+  font-size: 11px;
+  color: var(--suave);
+}
+
+.bag__slotItem {
+  font-size: 12px;
+  cursor: context-menu;
+}
+
+.bag__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bag__linha {
+  border: 1px solid var(--borda);
+  border-radius: 4px;
+  padding: 6px 8px;
+  background: #0f1320f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: context-menu;
+}
+
+.bag__linha.equipada {
+  border-color: var(--acento);
+}
+
+.bag__tag {
+  font-size: 11px;
+  color: var(--acento);
+}
+
+.bag__contexto {
+  position: fixed;
+  border: 1px solid var(--borda);
+  border-radius: 4px;
+  background: #10131af0;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 20;
+}
+
+.bag__ctxItem {
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.bag__ctxItem:hover {
+  background: #1d2330;
+}

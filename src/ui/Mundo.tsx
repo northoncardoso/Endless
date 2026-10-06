@@ -13,6 +13,7 @@ import { Batalha } from './Batalha'
 import { CriacaoPersonagem } from './CriacaoPersonagem'
 import { Dialogo } from './Dialogo'
 import { HUD } from './HUD'
+import { Bag } from './Bag'
 
 // Componente temporário até a issue 2 montar as telas de verdade. Aqui só o que
 // liga a cena do Pixi ao estado do jogo: guardar o estado, transformar tecla em
@@ -118,6 +119,7 @@ export function Mundo() {
         <>
           <HUD estado={estado} despachar={despachar} />
           <Dialogo estado={estado} despachar={despachar} />
+          <Bag estado={estado} despachar={despachar} />
         </>
       )}
     </div>
