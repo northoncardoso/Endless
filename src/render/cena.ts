@@ -138,7 +138,7 @@ function ajustarCamera(estado: Readonly<EstadoJogo>): void {
     }
 
     if (mundoAtual === null || atores === null || marcador === null) return
-    ajustarCamera(mundoAtual.mundo)
+    ajustarCamera(mundoAtual)
     atores.atualizar(mundoAtual.mundo)
     marcador.animar(segundos)
   })
