@@ -81,6 +81,13 @@ Toda a arte é do LPC, Liberated Pixel Cup, sob CC-BY-SA 3.0 e GPL 3.0.
 - Commit no formato do repositório, e a mensagem explica a razão, não só o
   diff.
 - CI verde antes do merge: teste, typecheck e lint.
+- A `main` tem proteção de branch: merge só por PR com a check `qualidade`
+  verde nos quatro passos, e até quem tem permissão de admin respeita a regra.
+  Quem garante a regra é a proteção, não uma promessa no fluxo manual.
+- A montagem da cena e o laço do jogo têm um teste de costura em
+  `src/ui/__tests__/costura.test.ts`, porque nenhum teste de `src/game/` vê a
+  pasta `src/ui`. Mexer em `Mundo.tsx` e manter esse teste passando é
+  obrigatório, senão o jogo pode abrir sem canvas com a CI verde.
 
 ## Configuração do opencode neste projeto
 
