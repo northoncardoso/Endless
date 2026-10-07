@@ -117,6 +117,13 @@ export function Batalha({
   }, [])
   if (batalha === null || unidade === undefined) return null
 
+  // `mover`, `escolher` e `confirmar` são declarações de função, e declaração é
+  // içada: o TypeScript analisa o corpo delas com o tipo declarado, sem enxergar
+  // o guard de cima. Estes dois nomes guardam o tipo já estreitado para dentro
+  // de `escolher` e `confirmar`, que é onde `batalha` e `unidade` voltam a aparecer.
+  const batalhaEmJogo = batalha
+  const unidadeDoTurno = unidade
+
   // Só aparece ação que pode ser usada agora, então a caixa e a batalha nunca
   // discordam. Quem monta a lista é a regra, com a bag do estado.
   const acoes = ativa && unidade.ehHeroi ? acoesDoTurno(estado) : []
@@ -149,7 +156,7 @@ export function Batalha({
     if (tipo === undefined) return
 
     if (tipo === 'atacar' || tipo === 'habilidade') {
-      const lista = alvosPara(batalha, unidade, { tipo, alvoId: '' }, { consumiveis })
+      const lista = alvosPara(batalhaEmJogo, unidadeDoTurno, { tipo, alvoId: '' }, { consumiveis })
       selecionarAlvo(lista[0]?.id ?? null)
       setPasso({ etapa: 'alvo', acao: tipo })
       setDestaque(0)
@@ -186,7 +193,7 @@ export function Batalha({
         // aviso na tela em vez de vida robada.
         const item = consumiveis[destaque]
         if (item === undefined) return
-        despachar({ tipo: 'agir', acao: { tipo: 'usarItem', alvoId: unidade.id, itemId: item.id } })
+        despachar({ tipo: 'agir', acao: { tipo: 'usarItem', alvoId: unidadeDoTurno.id, itemId: item.id } })
         return
       }
       case 'fuga':
@@ -201,8 +208,6 @@ export function Batalha({
     selecionarAlvo(null)
   }
 
-
-    if (batalha === null || unidade === undefined) return null
   if (batalha.fase === 'derrota') {
     return (
       <div className="batalha">
