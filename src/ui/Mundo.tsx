@@ -12,6 +12,7 @@ import { criarSorteador } from '../game/random'
 import { criarArmazenamentoLocal, criarArmazenamentoMemoria } from '../game/save'
 import { criarCena, type Cena } from '../render/cena'
 import { Batalha } from './Batalha'
+import { Bag } from './Bag'
 import { CriacaoPersonagem } from './CriacaoPersonagem'
 import { Dialogo } from './Dialogo'
 import { HUD } from './HUD'
@@ -175,6 +176,7 @@ export function Mundo() {
         <>
           <HUD estado={estado} despachar={despachar} />
           <Dialogo estado={estado} despachar={despachar} />
+          <Bag estado={estado} despachar={despachar} />
         </>
       )}
     </div>

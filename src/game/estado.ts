@@ -69,6 +69,8 @@ export interface EstadoJogo {
   // O diálogo em andamento. `null` é o estado normal, e um número é a página
   // que está na tela.
   dialogo: { rota: string; pagina: number } | null
+  mostrarBag?: boolean
+  mostrarMinimapa?: boolean
 }
 
 export type AcaoJogo =

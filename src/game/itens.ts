@@ -2,12 +2,12 @@ import { sortear, sortearInteiro, type Sorteador } from './random'
 import type { Consumivel, Item, ItemDaBag } from './tipos'
 
 export const CATALOGO_ITENS: readonly Item[] = [
-  { id: 'espada-de-ferro', nome: 'Espada de ferro', bonus: { forca: 3 } },
-  { id: 'arco-de-caça', nome: 'Arco de caça', bonus: { agilidade: 2 } },
-  { id: 'varinha-de-carvalho', nome: 'Varinha de carvalho', bonus: { inteligencia: 3 } },
-  { id: 'couraça-de-couro', nome: 'Couraça de couro', bonus: { vida: 3 } },
-  { id: 'amuleto-de-pedra', nome: 'Amuleto de pedra', bonus: { inteligencia: 1 } },
-  { id: 'poção-de-luz', nome: 'Poção de luz', bonus: { mana: 2 } },
+  { id: 'espada-de-ferro', nome: 'Espada de ferro', bonus: { forca: 3 }, tipo: 'arma', slot: 'arma', requeridoClasse: 'cavaleiro' },
+  { id: 'arco-de-caça', nome: 'Arco de caça', bonus: { agilidade: 2 }, tipo: 'ambos', slot: 'arma', requeridoClasse: 'arqueiro' },
+  { id: 'varinha-de-carvalho', nome: 'Varinha de carvalho', bonus: { inteligencia: 3 }, tipo: 'arma', slot: 'arma', requeridoClasse: 'mago' },
+  { id: 'couraça-de-couro', nome: 'Couraça de couro', bonus: { vida: 3 }, tipo: 'torso', slot: 'torso', requeridoClasse: 'qualquer' },
+  { id: 'amuleto-de-pedra', nome: 'Amuleto de pedra', bonus: { inteligencia: 1 }, tipo: 'colar', slot: 'colar', requeridoClasse: 'qualquer' },
+  { id: 'poção-de-luz', nome: 'Poção de luz', bonus: { mana: 2 }, tipo: 'torso', slot: 'torso', requeridoClasse: 'qualquer' },
 ]
 
 export const CHANCE_DROP_GOBLIN = 0.6
